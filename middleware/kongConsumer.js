@@ -12,6 +12,7 @@ module.exports = function KongConsumer(options) {
                     kongId: req.headers['x-consumer-id'],
                     name: req.headers['x-consumer-name']
                 };
+                res.setHeader('Content-Type', 'application/json');
                 next();
             } else {
                 res.status(401).send("Unknown Consumer");

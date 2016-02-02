@@ -1,6 +1,7 @@
 var express = require('express');
 var router = express.Router();
 var Organization = require('./organization');
+var bcrypt = require('bcrypt');
 
 module.exports = function RestController(schemaManager) {
 

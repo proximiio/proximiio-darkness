@@ -19,7 +19,7 @@ module.exports = {
         // middlewares
         var bodyParser = require('body-parser');
 
-        app.use(express.static(__dirname + 'public'));
+        app.use(express.static(__dirname + '/public'));
         app.use(bodyParser.urlencoded({ extended: true }));
         app.use(bodyParser.json());
         app.use(require('./request_logger'));

@@ -81,9 +81,9 @@ module.exports = function RestController(schemaManager) {
         }
     };
 
-    router.post(this.authRoot + '/login', login);
-    router.post(this.authRoot + '/logout', logout);
-    router.get(this.authRoot, currentUser);
+    router.post('/login', login);
+    router.post('/logout', logout);
+    router.get('/', currentUser);
     this.router = router;
 
     return this;

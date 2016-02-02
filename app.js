@@ -51,7 +51,7 @@ module.exports = {
                 });
 
                 // Auth Controller
-                app.use(authController.authRoot, authController.router);
+                app.use(schemaManager.schema.authRoot, authController.router);
                 Log.system('AuthController', 'schema exposed to '.white + authController.authRoot.yellow.bold + ' endpoint'.white);
 
                 // expose swagger-ui

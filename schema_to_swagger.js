@@ -93,7 +93,7 @@ module.exports = {
             },
             host: appSchema.settings[environment].servers.kong.host,
             basePath: appSchema.basePath,
-            schemes: ['http', 'https'],
+            schemes: ['https', 'http'],
             consumes: ['application/json'],
             produces: ['application/json'],
             paths: {},

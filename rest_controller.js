@@ -134,7 +134,7 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
 
                     var extensionsCallback = function(data) {
                         res.send(formatOutput(data));
-                        elasticAdapter.update(data.id, req.organization.id, data);
+                        elasticAdapter.update(req.organization.id, data);
                     };
 
                     if (typeof (_this.extensions) != 'undefined' && _this.extensions.callbackExists('create:after')) {
@@ -158,7 +158,7 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
                         Model.get(params.id).update(params).then(function(saveResult) {
                             Model.get(params.id).run().then(function(updated) {
                                 res.send(formatOutput(updated));
-                                elasticAdapter.update(params.id, req.organization.id, updated);
+                                elasticAdapter.update(req.organization.id, updated);
                             })
                         }).error(dbErrorHandler(res));
                     } else {

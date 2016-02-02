@@ -71,7 +71,7 @@ module.exports = {
                     schema: {
                         type: 'array',
                         items: {
-                            "$ref": "http://api.proximi.fi/core_schema/models/" + resource.capitalize()
+                            "$ref": "https://api.proximi.fi/core_schema/models/" + resource.capitalize()
                         }
                     }
                 }

@@ -9,7 +9,7 @@ module.exports = function SchemaManager(schema, environment) {
 
     this.initialize = function() {
         this.schema = schema;
-        this.environment = environment || process.env['DOPE_ENVIRONMENT'];
+        this.environment = environment || process.env['DARKNESS_ENVIRONMENT'];
         this.apiRoot = this.schema.apiRoot;
     };
 

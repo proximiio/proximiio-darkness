@@ -58,7 +58,7 @@ module.exports = function SchemaManager(schema, environment) {
     };
 
     this.swaggerDefResponse = function(req, res) {
-        res.send(this.toSwaggerJson());
+        res.send(_this.toSwaggerJson());
     };
 
     this.modelHandler = function(resource) {

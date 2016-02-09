@@ -1,6 +1,14 @@
-var Organization = require('../organization');
+var Organization = require('../tenant');
+var Log = require('../logger');
 
-module.exports = function KongConsumer(options) {
+/**
+ * Kong Consumer Middleware
+ * constructs consumer object from kong headers and assigns it to request object
+ *
+ * @returns {Function} - Express Middleware Function
+ * @constructor
+ */
+var KongConsumer = function() {
     return function(req, res, next) {
         if (req.isWhitelisted) {
             next();
@@ -9,15 +17,16 @@ module.exports = function KongConsumer(options) {
                 req.headers.hasOwnProperty('x-consumer-custom-id')) {
                 req.consumer = {
                     id: req.headers['x-consumer-custom-id'],
-                    kongId: req.headers['x-consumer-id'],
-                    name: req.headers['x-consumer-name']
+                    consumerId: req.headers['x-consumer-id'],
+                    name: req.headers['x-consumer-name'],
+                    token: req.headers['authorization'].replace('Bearer ', '')
                 };
-                res.setHeader('Content-Type', 'application/json');
                 next();
             } else {
                 res.status(401).send("Unknown Consumer");
             }
         }
-
     }
 };
+
+module.exports = KongConsumer;

@@ -1,8 +1,13 @@
 var _ = require('underscore');
+var pluralize = require('plur');
 var SchemaToSwagger = require('./schema_to_swagger');
 var RethinkManager = require('./rethink_manager');
 var RestController = require('./rest_controller');
 var SchemaModelHandler = require('./schema_model_handler');
+var bluebird = require('bluebird');
+var redis = require('redis');
+bluebird.promisifyAll(redis.RedisClient.prototype);
+bluebird.promisifyAll(redis.Multi.prototype);
 
 module.exports = function SchemaManager(schema, environment) {
     var _this = this;
@@ -11,6 +16,7 @@ module.exports = function SchemaManager(schema, environment) {
         this.schema = schema;
         this.environment = environment || process.env['DARKNESS_ENVIRONMENT'];
         this.apiRoot = this.schema.apiRoot;
+        this.multitenancy = this.schema.multitenancy.enabled;
     };
 
     this.initialize();
@@ -42,6 +48,8 @@ module.exports = function SchemaManager(schema, environment) {
         return _this.schema.settings[this.environment];
     };
 
+    this.redisClient = redis.createClient(this.schema.settings[this.environment].redis.url, this.schema.settings[this.environment].redis.options);
+
     this.restControllers = function() {
         var controllers = [];
         _.each(Object.keys(this.schema.resources), function(resource) {
@@ -63,5 +71,16 @@ module.exports = function SchemaManager(schema, environment) {
 
     this.modelHandler = function(resource) {
         return new SchemaModelHandler(_this.schema.resources[resource].schema);
-    }
+    };
+
+    // multitenancy related methods
+
+    this.getTenantEntityPlural = function() {
+        return pluralize(_this.schema.multitenancy.entity);
+    };
+
+    this.getTenantIdField = function() {
+        return _this.schema.multitenancy.entity + '_id';
+    };
+
 };

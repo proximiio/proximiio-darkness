@@ -1,90 +1,118 @@
 var express = require('express');
 var router = express.Router();
-var Organization = require('./organization');
-var bcrypt = require('bcrypt');
+var Tenant = require('./tenant');
+var User = require('./user');
+var RegistrationController = require('./registration_controller');
+var TokenManager = require('./token_manager');
 
 module.exports = function RestController(schemaManager) {
 
     this.authRoot = schemaManager.schema.authRoot;
 
-    var login = function(req, res) {
-        var email = req.body.email;
-        var password = req.body.password;
-        var hashed = bcrypt.hashSync(password, appSchema.auth.salt);
-        schemaManager.storage.table('users').filter({email: email, password: hashed}).run().then(function(results) {
-            if (results.length == 0) {
-                res.status(404).send({code: 404, message: "User Not Found"});
-            } else {
-                var user = results[0];
-                delete user['password'];
-                schemaManager.storage.table('organizations').get(user.organization_id).run().then(function(results) {
-                    if (results.length == 0) {
-                        res.status(404).send({code: 404, message: "Organization Not Found"});
-                    } else {
-                        var organization = new Organization(results);
-                        delete user['organization_id'];
-                        user.organization = organization.public();
-                        var apiKey = organization.getWriteToken();
-                        var consumerKey = organization.data.consumer_credentials;
-                        if (apiKey == null) {
-                            res.status(404).send({code: 401, message: "Write Access Not Available"});
-                        } else {
-                            res.send({
-                                "user": user,
-                                "auth": {
-                                    "api-key": apiKey,
-                                    "authorization": consumerKey
-                                }
-                            });
-                        }
-                    }
-                });
-            }
-        }).error(function(error) {
-            return res.status(500).send(JSON.stringify({error: error.message}));
-        });
-    };
-
-    var logout = function(req, res) {
-        res.send({success: true});
-    };
-
-    var currentUser = function(req, res) {
-        if (req.headers.hasOwnProperty('core-user')) {
-            schemaManager.storage.table('users').get(req.headers['core-user']).run().then(function (results) {
-                if (results == null) {
-                    res.status(404).send({code: 404, message: "User Not Found"});
-                } else {
-                    var user = results;
-                    delete user['password'];
-                    schemaManager.storage.table('organizations').get(user.organization_id).run().then(function (results) {
-                        if (results.length == 0) {
-                            res.status(404).send({code: 404, message: "Organization Not Found"});
-                        } else {
-                            console.log('found organization:', results);
-                            var organization = new Organization(results);
-                            delete user['organization_id'];
-                            user.organization = organization.public();
-                            var apiKey = organization.getWriteToken();
-                            if (apiKey == null) {
-                                res.status(404).send({code: 401, message: "Write Access Not Available"});
-                            } else {
-                                res.send(user);
-                            }
-                        }
-                    });
-                }
-            }).error(function (error) {
-                return res.status(500).send(JSON.stringify({error: error.message}));
-            });
-        } else {
-            res.status(404).send({code: 404, message: "Missing Core-User headers"});
+    /**
+     * Convenience method for error request responses
+     *
+     * @param {Object} res - Response
+     */
+    var respondWithError = function(res) {
+        return function(error) {
+            res.status(error.code).send(error.json);
         }
     };
 
+    /**
+     * Login Api Endpoint
+     *
+     * @param req
+     * @param res
+     */
+    var login = function(req, res) {
+        var email = req.body.email;
+        var password = req.body.password;
+        var encodedPassword = TokenManager.encode(password, schemaManager.schema.secret);
+
+        var loadTenantAndBuildResponse = function(user) {
+            return user.getTenant().then(function(tenant) {
+                var response = {
+                    user: user.public(),
+                    token: user.getToken()
+                };
+                response[schemaManager.schema.multitenancy.entity] = tenant.public();
+                return response;
+            });
+        };
+
+        User.findByEmailAndPassword(email, encodedPassword, schemaManager)
+            .then(loadTenantAndBuildResponse)
+            .then(function(response) {
+                res.send(JSON.stringify(response));
+            })
+            .catch(respondWithError(res));
+    };
+
+    /**
+     * Logout Api Endpoint
+     *
+     * @param req
+     * @param res
+     */
+    var logout = function(req, res) {
+        res.send(JSON.stringify({success: true}));
+    };
+
+    /**
+     * Current User Api Endpoint
+     *
+     * @param req
+     * @param res
+     */
+    var currentUser = function(req, res) {
+        User.findByToken(req.consumer.token, schemaManager).then(function(user) {
+            res.send(JSON.stringify(user.public()));
+        }).catch(respondWithError(res));
+    };
+
+    var authorize = function(req, res) {
+        var authRequest = req.body;
+
+        var authorizeToken = function(tenant) {
+            return tenant.authorizeToken(authRequest.token).then(function(payload) {
+                return {
+                    tenant: tenant.public(),
+                    tokenPayload: payload
+                }
+            });
+        };
+
+        var assignTokenTypeEntity = function(authResponse) {
+            if (authResponse.tokenPayload.type == 'user') {
+                return User.get(authResponse.tokenPayload.user_id, schemaManager).then(function(user) {
+                    authResponse.user = user.public();
+                    return authResponse;
+                });
+            } else {
+                return authResponse;
+            }
+        };
+
+        var respond = function(authResponse) {
+            res.send(authResponse);
+        };
+
+        Tenant.get(req.body.consumer_id, schemaManager)
+              .then(authorizeToken)
+              .then(assignTokenTypeEntity)
+              .then(respond);
+    };
+
+    var registrationController = new RegistrationController(schemaManager);
+
     router.post('/login', login);
     router.post('/logout', logout);
+    router.post('/authorize', authorize);
     router.get('/', currentUser);
+    router.use('/registration', registrationController.router);
+
     this.router = router;
 
     return this;

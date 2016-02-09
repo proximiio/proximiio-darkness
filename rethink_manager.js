@@ -1,6 +1,9 @@
+"use strict";
 var _ = require('underscore');
 var pluralize = require('plur');
 var colors = require('colors');
+var DatabaseDoesNotExistError = require('./errors/databaseDoesNotExist');
+var Log = require('./logger');
 
 module.exports = function RethinkManager(schemaManager) {
 
@@ -21,8 +24,8 @@ module.exports = function RethinkManager(schemaManager) {
         }
     });
 
-    this.createIndexes = function(table, callback) {
-        var resource = this.resourceMap[table];
+    this.createIndexes = function(table) {
+        var resource = _this.resourceMap[table];
         var indexesToCreate;
         if (typeof appSchema.resources[resource].schema.indexes != 'undefined') {
             indexesToCreate = appSchema.resources[resource].schema.indexes.slice();
@@ -30,88 +33,107 @@ module.exports = function RethinkManager(schemaManager) {
             indexesToCreate = [];
         }
 
-        var createNextIndex = function() {
-            var index = indexesToCreate[0];
+        let createIndex = (index) => {
             log('index ', index.yellow.bold, 'does not exist, creating...');
-            datastore.table(table).indexCreate(index).run().then(function(result) {
-                log('index ' + table.green.bold + '/' + index.yellow.bold + ' created');
-                indexesToCreate.shift();
-                if (indexesToCreate.length == 0) {
-                    callback();
-                } else {
-                    createNextIndex();
-                }
-            }).error(callback);
+            return datastore.table(table)
+                            .indexCreate(index)
+                            .run()
+                            .then((result) => {
+                                log('index ' + table.green.bold + '/' + index.yellow.bold + ' created');
+                            })
         };
 
-        datastore.table(table).indexList().run().then(function(indexes) {
-            _.each(indexes, function(index) {
-               if (_.contains(indexesToCreate, index)) {
-                   indexesToCreate = _.without(indexesToCreate, index);
-               }
+        var createIndexPromises = [];
+
+        let reduceByExisting = (indexes) => {
+            indexes.forEach((index) => {
+                if (_.contains(indexesToCreate, index)) {
+                    indexesToCreate = _.without(indexesToCreate, index);
+                }
             });
-            if (indexesToCreate.length == 0) {
-                callback();
-            } else {
-                createNextIndex();
-            }
-        }).error(callback);
+            return indexesToCreate;
+        };
+
+        let generateCreateIndexPromises = (indexes) => {
+            indexes.forEach((index) => {
+                createIndexPromises.push(createIndex(index));
+            });
+        };
+
+        return datastore.table(table)
+                        .indexList().run()
+                        .then(reduceByExisting)
+                        .then(generateCreateIndexPromises)
+                        .all(createIndexPromises);
     };
 
-    this.checkTables = function(callback) {
-        var tablesToCreate = Object.keys(this.resourceMap);
-        datastore.tableList().run().then(function(tables) {
-            _.each(tables, function(table) {
+    this.checkTables = function(databaseExists) {
+        var tablesToCreate = Object.keys(_this.resourceMap);
+
+        let getTablesToCreate = (tables) => {
+            tables.forEach((table) => {
                 if (_.contains(tablesToCreate, table)) {
                     tablesToCreate = _.without(tablesToCreate, table);
                 }
             });
-            if (tablesToCreate.length == 0) {
-                callback();
-            } else {
-                createNextTable();
-            }
-        }).error(callback);
-
-        var createNextTable = function() {
-            var table = tablesToCreate[0];
-            log('table ' + table.green.bold + ' does not exist, creating...');
-            datastore.tableCreate(table).run().then(function(result) {
-                tablesToCreate.shift();
-                log('table ' + table.green.bold + ' created');
-
-                _this.createIndexes(table, function() {
-                    if (tablesToCreate.length > 0) {
-                        createNextTable();
-                    } else {
-                        callback();
-                    }
-                });
-            }).error(callback);
+            return tablesToCreate;
         };
 
+        let createTable = (table) => {
+            return datastore.tableCreate(table).run()
+                            .then((result) => {
+                                log('table ' + table.green.bold + ' created');
+
+                                _this.createIndexes(table, function() {
+                                    if (tablesToCreate.length > 0) {
+                                        createNextTable();
+                                    } else {
+                                        callback();
+                                    }
+                                });
+                            });
+        };
+
+        let createTablePromises = [];
+
+        let generateCreateTablePromises = (tables) => {
+            tables.forEach((table) => {
+                createTablePromises.push(createTable(table));
+            });
+            return createTablePromises;
+        };
+
+        return datastore.tableList().run()
+                        .then(getTablesToCreate)
+                        .then(generateCreateTablePromises)
+                        .all(createTablePromises);
     };
 
-    this.checkDatabase = function(callback) {
-        datastore.dbList().run().then(function(databases) {
-            callback(null, _.contains(databases, schemaManager.settings().datastore.db));
-        }).error(callback);
+    this.checkDatabase = function() {
+        let containsDatabase = (databases) => {
+            return _.contains(databases, schemaManager.settings().datastore.db);
+        };
+
+        return datastore.dbList().run()
+                        .then(containsDatabase)
+                        .then((databaseExists) => {
+                           if (!databaseExists) {
+                               var error = new DatabaseDoesNotExistError();
+                               throw(error);
+                           }
+                           return databaseExists;
+                        })
+                        .then(_this.checkTables)
     };
 
-    this.ensureReady = function(callback) {
+    this.ensureReady = function() {
 
-        this.checkDatabase(function(err, exists) {
-            if (err) {
-                callback(err);
-            } else {
-                _this.checkTables(callback);
-            }
-        });
+        return _this.checkDatabase()
+                    .then(_this.checkTables);
     };
 
     var log = function(msg) {
-        console.log((new Date() + '').gray, 'RethinkManager: '.white.bold, msg);
+        Log.d(_this.tag, msg);
     };
-
 
 };

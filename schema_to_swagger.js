@@ -102,7 +102,7 @@ module.exports = {
 
         swagger.paths[appSchema.authRoot + "/login"] = {
             post: {
-                tags: ["[Web UserSystem]"],
+                tags: ["[Auth System]"],
                 description: "Login with email and password",
                 operationId: 'login',
                 parameters: [
@@ -118,6 +118,29 @@ module.exports = {
                     },
                     '404': {
                         description: 'User not found'
+                    }
+                }
+            }
+        };
+
+        swagger.paths[appSchema.publicRoot + "/registration"] = {
+            post: {
+                tags: ["[Auth System]"],
+                description: "Registration action",
+                operationId: 'registration',
+                parameters: [
+                    {name: "email", in: 'formData', type: 'string', 'description': "Email of user", required: true},
+                    {name: "password", in: 'formData', type: 'string', 'description': "Password of user", required: true}
+                ],
+                response: {
+                    '200': {
+                        description: 'Successful registration response'
+                    },
+                    '1011': {
+                        description: 'Invalid Email Format'
+                    },
+                    '1012': {
+                        description: 'Email was already registered'
                     }
                 }
             }

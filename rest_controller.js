@@ -3,9 +3,11 @@ var router = express.Router();
 var pluralize = require('plur');
 var fs = require('fs');
 var request = require('request');
+var when = require('when');
+var Log = require('./logger');
 var capitalize = require('./helpers/capitalize')(); // extends String.prototype
 var SchemaHandler = require('./schema_model_handler');
-var Organization = require('./organization');
+var Organization = require('./tenant');
 var ElasticAdapter = require('./elastic_adapter');
 
 var DEFAULT_LIMIT = 10;
@@ -15,18 +17,13 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
 
     this.resource = resource;
     this.plural = pluralize(resource);
-    this.tag = ((this.plural) + 'Controller').capitalize();
+    var TAG = ((this.plural) + 'Controller').capitalize();
+    this.tag = TAG;
     this.datastore = datastore;
-    this.schemaManager = schemaManager;
 
+    this.schemaManager = schemaManager;
     var Model = this.datastore.table(this.plural);
     var elasticAdapter = new ElasticAdapter(schemaManager);
-
-    var elasticPath = function(req, id) {
-        return schemaManager.schema.elasticRoot + '/proximi-' + req.organization.id + '/' + pluralize(resource) + '/' + id;
-    };
-
-    this.elasticPath = schemaManager.elasticRoot + '/core/' + resource + '/';
 
     var hasExtensions = function(callback) {
         var fileName = __dirname + '/extensions/' + pluralize(resource).capitalize() + 'Controller.js';
@@ -38,7 +35,7 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
     hasExtensions(function(error, fileName) {
         if (error) {
         } else {
-            console.log('loading extensions from path:', fileName);
+            Log.d(TAG, 'loading extensions from path: ', fileName);
             var Extension = require(fileName);
             _this.extensions = new Extension(resource, _this);
         }
@@ -59,7 +56,7 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
     };
 
     var ownershipError = function(res) {
-        res.status(401).send("Organization does not have access for this entity");
+        res.status(401).send("Tenant does not have access for this entity");
     };
 
     var validationErrorHandler = function(error, res, callback) {
@@ -82,8 +79,14 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
         var limit = parseInt(req.query.limit) || DEFAULT_LIMIT;
         var skip = parseInt(req.query.skip) || 0;
         var order = req.query.order || 'id';
+        var filter = {};
+
+        if (schemaManager.multitenancy) {
+            filter[schemaManager.schema.multitenancy.entity + '_id'] = req.consumer.id;
+        }
+
         Model.orderBy({index: order})
-             .filter({organization_id: req.consumer.id})
+             .filter(filter)
              .skip(skip)
              .limit(limit)
              .run().then(function(result) {
@@ -94,7 +97,6 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
 
     this.count = function(req, res) {
         Model.count().run().then(function(result) {
-            console.log('resource', resource, 'record count:' ,result);
             if (result == null) {
                 res.status(404).send("Resource for count Not Found");
             } else {
@@ -123,7 +125,7 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
             delete params['id'];
         }
 
-        params.organization_id = req.organization.id;
+        params[schemaManager.getTenantIdField()] = req.tenant.id;
         params.createdAt = new Date().toISOString();
         params.updatedAt = params.createdAt;
 
@@ -134,7 +136,11 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
 
                     var extensionsCallback = function(data) {
                         res.send(formatOutput(data));
-                        elasticAdapter.update(req.organization.id, data);
+                        if (schemaManager.multitenancy) {
+                            elasticAdapter.update(data, req.tenant.id);
+                        } else {
+                            elasticAdapter.update(data);
+                        }
                     };
 
                     if (typeof (_this.extensions) != 'undefined' && _this.extensions.callbackExists('create:after')) {
@@ -149,16 +155,20 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
 
     this.update = function(req, res) {
         var params = req.body;
-        params.organization_id = req.organization.id;
+
+        if (schemaManager.multitenancy) {
+            params[schemaManager.getTenantIdField()] = req.tenant.id;
+        }
+
         params.updatedAt = (new Date()).toISOString();
         schemaModelHandler.extractAndValidateParams(params, function(err, params) {
             validationErrorHandler(err, res, function() {
                 Model.get(params.id).run().then(function(result) {
-                    if (req.organization.validatesOwnership(result)) {
+                    if (req.tenant.validatesOwnership(result)) {
                         Model.get(params.id).update(params).then(function(saveResult) {
                             Model.get(params.id).run().then(function(updated) {
                                 res.send(formatOutput(updated));
-                                elasticAdapter.update(req.organization.id, updated);
+                                elasticAdapter.update(req.tenant.id, updated);
                             })
                         }).error(dbErrorHandler(res));
                     } else {
@@ -182,8 +192,7 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
 
     this.delete = function(req, res) {
         Model.get(req.params.id).run().then(function(result) {
-            if (req.organization.validatesOwnership(result)) {
-                var instance = new Model(result);
+            if (req.tenant.validatesOwnership(result)) {
                 Model.get(req.params.id).delete().run().then(function(deleteResult) {
                     result.isDeleted = true;
                     res.send(formatOutput(result));

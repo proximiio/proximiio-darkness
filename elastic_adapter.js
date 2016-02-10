@@ -1,6 +1,7 @@
 var Log = require('./logger');
 var Promise = require("bluebird");
 var request = Promise.promisify(require("request"));
+var pluralize = require('plur');
 Promise.promisifyAll(request);
 
 /**

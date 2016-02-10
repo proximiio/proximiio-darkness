@@ -154,7 +154,6 @@ var RegistrationController = function(schemaManager) {
 
             return User.findByEmailAndPassword(email, encodedPassword, schemaManager)
                 .then(prepareResponse)
-                .catch(respondWithError(res));
         }
     };
     /**

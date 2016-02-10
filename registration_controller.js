@@ -135,6 +135,31 @@ var RegistrationController = function(schemaManager) {
         }
     };
 
+    var loginUser = function(req) {
+        return function(tenant) {
+            var email = req.body.email;
+            var password = req.body.password;
+            var encodedPassword = TokenManager.encode(password, schemaManager.schema.secret);
+
+            var prepareResponse = function (user) {
+                var response = {
+                    user: user.public(),
+                    token: user.getToken(),
+                    instance_id: req.body.instance_id,
+                    eventBusRef: tenant.g
+                };
+                response[schemaManager.schema.multitenancy.entity] = tenant.public();
+                return response;
+            };
+
+            User.findByEmailAndPassword(email, encodedPassword, schemaManager)
+                .then(prepareResponse)
+                .then(function (response) {
+                    res.send(JSON.stringify(response));
+                })
+                .catch(respondWithError(res));
+        }
+    };
     /**
      * Registration Api Endpoint
      *
@@ -149,8 +174,9 @@ var RegistrationController = function(schemaManager) {
                 .then(addKongConsumer)
                 .then(addKongConsumerCredentials)
                 .then(addUserAccount(params.name, params.email, params.password, params.instance_id))
-                .then(function(tenant) {
-                    res.send(tenant.public());
+                .then(loginUser(req))
+                .then(function(response) {
+                    res.send(response);
                 })
                 .catch(EmailUniquenessError, respondWithError(res))
                 .catch(StatusCodeError, function(error) {

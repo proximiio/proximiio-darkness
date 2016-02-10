@@ -1,3 +1,5 @@
+"use strict";
+
 var jwt = require('jwt-simple');
 
 /**
@@ -41,7 +43,18 @@ var userToken = function(key, secret, tenantId, user) {
         "type": "user",
         "user": user.getName(),
         "user_id": user.getId(),
+        "instance_id": user.getInstanceId(),
         "tenant_id": tenantId
+    }, secret);
+};
+
+var portalToken = function(key, secret, instanceId) {
+    return jwt.encode({
+        "typ": "JWT",
+        "alg": "HS256",
+        "iss": key,
+        "type": "portal",
+        "instance_id": instanceId
     }, secret);
 };
 

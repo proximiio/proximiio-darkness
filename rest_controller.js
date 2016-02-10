@@ -167,8 +167,20 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
                     if (req.tenant.validatesOwnership(result)) {
                         Model.get(params.id).update(params).then(function(saveResult) {
                             Model.get(params.id).run().then(function(updated) {
-                                res.send(formatOutput(updated));
-                                elasticAdapter.update(req.tenant.id, updated);
+                                var extensionsCallback = function(data) {
+                                    res.send(formatOutput(updated));
+                                    if (schemaManager.multitenancy) {
+                                        elasticAdapter.update(updated, req.tenant.id);
+                                    } else {
+                                        elasticAdapter.update(updated);
+                                    }
+                                };
+
+                                if (typeof (_this.extensions) != 'undefined' && _this.extensions.callbackExists('update:after')) {
+                                    _this.extensions.callback('update:after', req, res, params, extensionsCallback);
+                                } else {
+                                    extensionsCallback(updated);
+                                }
                             })
                         }).error(dbErrorHandler(res));
                     } else {
@@ -190,7 +202,7 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
         }
     };
 
-    this.delete = function(req, res) {
+    this.destroy = function(req, res) {
         Model.get(req.params.id).run().then(function(result) {
             if (req.tenant.validatesOwnership(result)) {
                 Model.get(req.params.id).delete().run().then(function(deleteResult) {
@@ -210,7 +222,7 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
     router.post('/' + this.plural, this.create);
     router.put('/' + this.plural, this.upsert);
     router.put('/' + this.plural + '/:id', this.update);
-    router.delete('/' + this.plural + '/:id', this.delete);
+    router.delete('/' + this.plural + '/:id', this.destroy);
 
     this.router = router;
 

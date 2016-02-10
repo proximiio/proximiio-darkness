@@ -1,3 +1,4 @@
+"use strict";
 var Promise = require('bluebird');
 var express = require('express');
 var router = express.Router();
@@ -69,16 +70,18 @@ var RegistrationController = function(schemaManager) {
     /**
      * Adds Initial User Account and adds generated JWT Token to Tenant
      *
-     * @param name
-     * @param email
-     * @param password
+     * @param {String} name
+     * @param {String} email
+     * @param {String} password
+     * @param {String} instanceId
      * @returns {Function}
      */
-    var addUserAccount = function(name, email, password) {
+    var addUserAccount = function(name, email, password, instanceId) {
         return function(tenant) {
             var data = {
                 name: name,
                 email: email,
+                instanceId: instanceId,
                 password: TokenManager.encode(password, schemaManager.schema.secret)
             };
             data[schemaManager.getTenantIdField()] = tenant.getId();
@@ -103,6 +106,35 @@ var RegistrationController = function(schemaManager) {
         }
     };
 
+    var addPortal = function(name, email, password, instanceId) {
+        return function(tenant) {
+            var data = {
+                name: name,
+                email: email,
+                password: TokenManager.encode(password, schemaManager.schema.secret)
+            };
+            data[schemaManager.getTenantIdField()] = tenant.getId();
+
+            var user = new User(data, schemaManager);
+
+            var assignTokenToUser = function(user) {
+                var credentials = tenant.getConsumerCredentials();
+                var token = TokenManager.userToken(credentials.key, credentials.secret, tenant.getId(), user);
+                user.setToken(token);
+                return user.save();
+            };
+
+            var assignTokenToTenant = function(user) {
+                tenant.addToken(user.getToken());
+                return tenant.save();
+            };
+
+            return user.save()
+                .then(assignTokenToUser)
+                .then(assignTokenToTenant);
+        }
+    };
+
     /**
      * Registration Api Endpoint
      *
@@ -116,7 +148,7 @@ var RegistrationController = function(schemaManager) {
                 .then(createTenant(params))
                 .then(addKongConsumer)
                 .then(addKongConsumerCredentials)
-                .then(addUserAccount(params.name, params.email, params.password))
+                .then(addUserAccount(params.name, params.email, params.password, params.instance_id))
                 .then(function(tenant) {
                     res.send(tenant.public());
                 })
@@ -134,6 +166,7 @@ var RegistrationController = function(schemaManager) {
             respondWithError(res)(new InvalidEmailFormatError());
         }
     };
+
 
     router.post('/', registration);
     this.router = router;

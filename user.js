@@ -1,3 +1,5 @@
+"use strict";
+
 var TokenManager = require('./token_manager');
 var UserNotFoundError = require('./errors/userNotFoundError');
 var Tenant = require('./tenant');
@@ -23,6 +25,10 @@ var User = function(data, schemaManager) {
     this.getName = function() {
         return this.data.name;
     };
+
+    this.getInstanceId = function() {
+        return this.data.instance_id;
+    }
 
     /**
      * Upserts current user data to datastore

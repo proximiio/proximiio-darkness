@@ -2,17 +2,17 @@
 var Promise = require('bluebird');
 var express = require('express');
 var router = express.Router();
-var emailValidator = require('./helpers/emailValidator');
-var NotAllowedError = require('./errors/notAllowedError');
-var InvalidEmailFormatError = require('./errors/invalidEmailFormatError');
-var EmailUniquenessError = require('./errors/emailUniquenessError');
-var StatusCodeError = require('./errors/statusCodeError');
-var DarkError = require('./errors/darkError');
+var emailValidator = require(__dirname + '/helpers/emailValidator');
+var NotAllowedError = require(__dirname + '/errors/notAllowedError');
+var InvalidEmailFormatError = require(__dirname + '/errors/invalidEmailFormatError');
+var EmailUniquenessError = require(__dirname + '/errors/emailUniquenessError');
+var StatusCodeError = require(__dirname + '/errors/statusCodeError');
+var DarkError = require(__dirname + '/errors/darkError');
 
-var KongManager = require('./kong_manager');
-var TokenManager = require('./token_manager');
-var Tenant = require('./tenant');
-var User = require('./user');
+var KongManager = require(__dirname + '/kong_manager');
+var TokenManager = require(__dirname + '/token_manager');
+var Tenant = require(__dirname + '/tenant');
+var User = require(__dirname + '/user');
 
 var RegistrationController = function(schemaManager) {
     var _this = this;

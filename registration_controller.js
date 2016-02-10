@@ -106,35 +106,6 @@ var RegistrationController = function(schemaManager) {
         }
     };
 
-    var addPortal = function(name, email, password, instanceId) {
-        return function(tenant) {
-            var data = {
-                name: name,
-                email: email,
-                password: TokenManager.encode(password, schemaManager.schema.secret)
-            };
-            data[schemaManager.getTenantIdField()] = tenant.getId();
-
-            var user = new User(data, schemaManager);
-
-            var assignTokenToUser = function(user) {
-                var credentials = tenant.getConsumerCredentials();
-                var token = TokenManager.userToken(credentials.key, credentials.secret, tenant.getId(), user);
-                user.setToken(token);
-                return user.save();
-            };
-
-            var assignTokenToTenant = function(user) {
-                tenant.addToken(user.getToken());
-                return tenant.save();
-            };
-
-            return user.save()
-                .then(assignTokenToUser)
-                .then(assignTokenToTenant);
-        }
-    };
-
     var loginUser = function(req) {
         return function(tenant) {
             var email = req.body.email;
@@ -153,9 +124,10 @@ var RegistrationController = function(schemaManager) {
             };
 
             return User.findByEmailAndPassword(email, encodedPassword, schemaManager)
-                .then(prepareResponse)
+                       .then(prepareResponse);
         }
     };
+
     /**
      * Registration Api Endpoint
      *
@@ -172,7 +144,7 @@ var RegistrationController = function(schemaManager) {
                 .then(addUserAccount(params.name, params.email, params.password, params.instance_id))
                 .then(loginUser(req))
                 .then(function(response) {
-                    res.send(response);
+                    res.send(JSON.stringify(response));
                 })
                 .catch(EmailUniquenessError, respondWithError(res))
                 .catch(StatusCodeError, function(error) {

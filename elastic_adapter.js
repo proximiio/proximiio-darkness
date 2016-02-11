@@ -73,7 +73,7 @@ var ElasticAdapter = function(schemaManager) {
      * @param [tenantId] {String} Tenant ID/UUID
      * @returns {string}
      */
-    var path = function(id, tenantId) {
+    var path = function(resource, id, tenantId) {
         var index = schemaManager.schema.elasticsearch.indexKey;
         if (schemaManager.multitenancy) {
             index += '-' + tenantId;
@@ -92,7 +92,7 @@ var ElasticAdapter = function(schemaManager) {
 
     this.update = function(data, tenantId, callback) {
         if (available(data.id, tenantId)) {
-            var requestData = {url: path(data.id, tenantId), body: JSON.stringify(data)};
+            var requestData = {url: path(resource, data.id, tenantId), body: JSON.stringify(data)};
             request.putAsync(requestData)
                    .then(function(response, body) {
                         Log.system(TAG, 'updated: ', data.id);
@@ -117,7 +117,7 @@ var ElasticAdapter = function(schemaManager) {
      */
     this.delete = function(id, tenantId, callback) {
         if (available(id, tenantId)) {
-            var requestData = {url: path(tenantId, id)};
+            var requestData = {url: path(resource, tenantId, id)};
             request.delAsync(requestData)
                    .then(function(response, body) {
                         Log.system(TAG, 'deleted: ', id);

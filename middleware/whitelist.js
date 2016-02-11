@@ -13,7 +13,8 @@ var UrlWhitelist = function(whitelist) {
     return function (req, res, next) {
         _.each(whitelist, function(url) {
             if (typeof url == 'string') {
-                if (url == req.path) {
+                console.log('whitelistpath', req.path);
+                if (url == req.path.split('?')[0]) {
                     req.isWhitelisted = true;
                     Log.d(TAG, "Whitelisting request");
                 }

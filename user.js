@@ -127,6 +127,7 @@ User.findByEmailAndPassword = function(email, password, schemaManager) {
     var encodedPassword = TokenManager.encode(password, schemaManager.schema.secret);
     var filter = {email: email, password: encodedPassword};
     return schemaManager.storage.table('users').filter(filter).run().then(function(data) {
+
         if (data.length == 1) {
             return new User(data[0], schemaManager);
         } else {

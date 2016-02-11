@@ -110,7 +110,7 @@ var RegistrationController = function(schemaManager) {
         return function(tenant) {
             var email = req.body.email;
             var password = req.body.password;
-            //var encodedPassword = TokenManager.encode(password, schemaManager.schema.secret);
+            var encodedPassword = TokenManager.encode(password, schemaManager.schema.secret);
 
             var prepareResponse = function (user) {
                 var response = {
@@ -123,7 +123,7 @@ var RegistrationController = function(schemaManager) {
                 return response;
             };
 
-            return User.findByEmailAndPassword(email, password, schemaManager)
+            return User.findByEmailAndPassword(email, encodedPassword, schemaManager)
                        .then(prepareResponse);
         }
     };

@@ -238,6 +238,9 @@ var Tenant = function(tenant, schemaManager) {
         });
     };
 
+    this.getFirebaseRef = function() {
+        return schemaManager.schema.firebase.ref + '/organizations/' + this.getId();
+    };
     return this;
 
 };

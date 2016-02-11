@@ -137,9 +137,9 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
                     var extensionsCallback = function(data) {
                         res.send(formatOutput(data));
                         if (schemaManager.multitenancy) {
-                            elasticAdapter.update(data, req.tenant.id);
+                            elasticAdapter.update(resource, data, req.tenant.id);
                         } else {
-                            elasticAdapter.update(data);
+                            elasticAdapter.update(resource, data);
                         }
                     };
 
@@ -170,9 +170,9 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
                                 var extensionsCallback = function(data) {
                                     res.send(formatOutput(updated));
                                     if (schemaManager.multitenancy) {
-                                        elasticAdapter.update(updated, req.tenant.id);
+                                        elasticAdapter.update(resource, updated, req.tenant.id);
                                     } else {
-                                        elasticAdapter.update(updated);
+                                        elasticAdapter.update(resource, updated);
                                     }
                                 };
 
@@ -208,7 +208,7 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
                 Model.get(req.params.id).delete().run().then(function(deleteResult) {
                     result.isDeleted = true;
                     res.send(formatOutput(result));
-                    elasticAdapter.delete(req.params.id, req.organization.id);
+                    elasticAdapter.delete(resource, req.params.id, req.organization.id);
                 });
             } else {
                 ownershipErrorHandle(res);

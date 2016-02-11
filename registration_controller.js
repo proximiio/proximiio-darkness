@@ -117,7 +117,7 @@ var RegistrationController = function(schemaManager) {
                     user: user.public(),
                     token: user.getToken(),
                     instance_id: req.body.instance_id,
-                    eventBusRef: tenant.g
+                    eventBusRef: tenant.getFirebaseRef()
                 };
                 response[schemaManager.schema.multitenancy.entity] = tenant.public();
                 return response;

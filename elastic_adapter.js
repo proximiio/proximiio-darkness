@@ -90,7 +90,7 @@ var ElasticAdapter = function(schemaManager) {
      * @param [callback]
      */
 
-    this.update = function(data, tenantId, callback) {
+    this.update = function(resource, data, tenantId, callback) {
         if (available(data.id, tenantId)) {
             var requestData = {url: path(resource, data.id, tenantId), body: JSON.stringify(data)};
             request.putAsync(requestData)
@@ -115,7 +115,7 @@ var ElasticAdapter = function(schemaManager) {
      * @param [tenantId] {String} Tenant ID/UUID
      * @param [callback]
      */
-    this.delete = function(id, tenantId, callback) {
+    this.delete = function(resource, id, tenantId, callback) {
         if (available(id, tenantId)) {
             var requestData = {url: path(resource, tenantId, id)};
             request.delAsync(requestData)

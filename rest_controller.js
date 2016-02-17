@@ -137,9 +137,9 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
                     var extensionsCallback = function(data) {
                         res.send(formatOutput(data));
                         if (schemaManager.multitenancy) {
-                            elasticAdapter.update(resource, data, req.tenant.id);
+                            elasticAdapter.update(data, req.tenant.id);
                         } else {
-                            elasticAdapter.update(resource, data);
+                            elasticAdapter.update(data);
                         }
                     };
 
@@ -170,11 +170,11 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
                                 var extensionsCallback = function(data) {
                                     res.send(formatOutput(updated));
                                     if (schemaManager.multitenancy) {
-                                        elasticAdapter.update(resource, updated, req.tenant.id);
+                                        elasticAdapter.update(updated, req.tenant.id);
                                     } else {
-                                        elasticAdapter.update(resource, updated);
+                                        elasticAdapter.update(updated);
                                     }
-                                };
+                                }
 
                                 if (typeof (_this.extensions) != 'undefined' && _this.extensions.callbackExists('update:after')) {
                                     _this.extensions.callback('update:after', req, res, params, extensionsCallback);
@@ -202,13 +202,13 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
         }
     };
 
-    this.destroy = function(req, res) {
+    this.delete = function(req, res) {
         Model.get(req.params.id).run().then(function(result) {
             if (req.tenant.validatesOwnership(result)) {
                 Model.get(req.params.id).delete().run().then(function(deleteResult) {
                     result.isDeleted = true;
                     res.send(formatOutput(result));
-                    elasticAdapter.delete(resource, req.params.id, req.organization.id);
+                    elasticAdapter.delete(req.params.id, req.organization.id);
                 });
             } else {
                 ownershipErrorHandle(res);
@@ -222,7 +222,7 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
     router.post('/' + this.plural, this.create);
     router.put('/' + this.plural, this.upsert);
     router.put('/' + this.plural + '/:id', this.update);
-    router.delete('/' + this.plural + '/:id', this.destroy);
+    router.delete('/' + this.plural + '/:id', this.delete);
 
     this.router = router;
 

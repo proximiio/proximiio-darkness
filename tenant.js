@@ -157,8 +157,7 @@ var Tenant = function(tenant, schemaManager) {
     this.public = function() {
         return {
             id: _this.data.id,
-            name: _this.data.name,
-            eventBusRef: schemaManager.settings().firebase.ref + '/' + schemaManager.getTenantEntityPlural() + '/' + _this.data.id + ''
+            name: _this.data.name
         }
     };
 
@@ -220,12 +219,6 @@ var Tenant = function(tenant, schemaManager) {
         return TokenManager.applicationToken(credentials.key, credentials.secret, applicationId);
     };
 
-    this.generatePortalToken = function() {
-        var credentials = TokenManager.decode(_this.data.consumerCredentials, schemaManager.schema.secret);
-        var instanceId = 'abcdefg';
-        return TokenManager.portalToken(credentials.key, credentials.secret, instanceId);
-    };
-
     this.getData = function() {
         return _this.data;
     };
@@ -238,9 +231,6 @@ var Tenant = function(tenant, schemaManager) {
         });
     };
 
-    this.getFirebaseRef = function() {
-        return schemaManager.schema.firebase.ref + '/organizations/' + this.getId();
-    };
     return this;
 
 };

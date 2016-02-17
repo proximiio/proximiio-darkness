@@ -1,7 +1,6 @@
 var Log = require('./logger');
 var Promise = require("bluebird");
 var request = Promise.promisify(require("request"));
-var pluralize = require('plur');
 Promise.promisifyAll(request);
 
 /**
@@ -73,7 +72,7 @@ var ElasticAdapter = function(schemaManager) {
      * @param [tenantId] {String} Tenant ID/UUID
      * @returns {string}
      */
-    var path = function(resource, id, tenantId) {
+    var path = function(id, tenantId) {
         var index = schemaManager.schema.elasticsearch.indexKey;
         if (schemaManager.multitenancy) {
             index += '-' + tenantId;
@@ -90,9 +89,9 @@ var ElasticAdapter = function(schemaManager) {
      * @param [callback]
      */
 
-    this.update = function(resource, data, tenantId, callback) {
+    this.update = function(data, tenantId, callback) {
         if (available(data.id, tenantId)) {
-            var requestData = {url: path(resource, data.id, tenantId), body: JSON.stringify(data)};
+            var requestData = {url: path(data.id, tenantId), body: JSON.stringify(data)};
             request.putAsync(requestData)
                    .then(function(response, body) {
                         Log.system(TAG, 'updated: ', data.id);
@@ -115,9 +114,9 @@ var ElasticAdapter = function(schemaManager) {
      * @param [tenantId] {String} Tenant ID/UUID
      * @param [callback]
      */
-    this.delete = function(resource, id, tenantId, callback) {
+    this.delete = function(id, tenantId, callback) {
         if (available(id, tenantId)) {
-            var requestData = {url: path(resource, tenantId, id)};
+            var requestData = {url: path(tenantId, id)};
             request.delAsync(requestData)
                    .then(function(response, body) {
                         Log.system(TAG, 'deleted: ', id);

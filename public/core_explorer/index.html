@@ -97,7 +97,8 @@
       */
 
       window.swaggerUi.load();
-      window.swaggerUi.api.clientAuthorizations.add("kong", new SwaggerClient.ApiKeyAuthorization("Authorization", "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiIsImlzcyI6IjliZGE4NmFhZjc1MTQ4YTJjODU4Yzk1MDdlNDExNjA1IiwidHlwZSI6InVzZXIiLCJ1c2VyIjoiUHJveGltaS5pbyBEZXZzIiwidXNlcl9pZCI6IjI3NjdmZDgyLTQxOGUtNDQ1Ni04N2U0LTcxMzRhYjk2ODk5NCIsInRlbmFudF9pZCI6IjEyZmZiNjFkLWE5OWUtNGVkZC04ZTIxLTg1YmVjOWQ0MjYyMiJ9.Fp7Ejjm7yZSG-cemEwDpRn135qabmKVhmxW0rM_IZbI", "header"));
+      window.swaggerUi.api.clientAuthorizations.add("kong", new SwaggerClient.ApiKeyAuthorization("Authorization", "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiIyODEwOTQ0OTRmYTA0MGM3YzBhNjkxNzJhYjc2ODc5YyIsImlhdCI6MTQ1MzQ3MTY4NywiZXhwIjoxNDg1MDA3Njg3LCJhdWQiOiIiLCJzdWIiOiIiLCJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.xvO8zA0jS7VIZ3lwLGPIi7HObdAr3322dhHclHtsoOU", "header"));
+      window.swaggerUi.api.clientAuthorizations.add("api_key", new SwaggerClient.ApiKeyAuthorization("Api-Key", "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3N1ZWRBdCI6IjIwMTYtMDEtMjBUMjE6NTQ6MTEuOTk5WiIsIndyaXRlIjp0cnVlfQ.mgKojkI-P2zTXiXZddOzUMh6ZIHoutw_pov2z1Mmtf0", "header"));
 
       function log() {
         if ('console' in window) {

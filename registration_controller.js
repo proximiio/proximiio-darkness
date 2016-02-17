@@ -1,4 +1,3 @@
-"use strict";
 var Promise = require('bluebird');
 var express = require('express');
 var router = express.Router();
@@ -70,18 +69,16 @@ var RegistrationController = function(schemaManager) {
     /**
      * Adds Initial User Account and adds generated JWT Token to Tenant
      *
-     * @param {String} name
-     * @param {String} email
-     * @param {String} password
-     * @param {String} instanceId
+     * @param name
+     * @param email
+     * @param password
      * @returns {Function}
      */
-    var addUserAccount = function(name, email, password, instanceId) {
+    var addUserAccount = function(name, email, password) {
         return function(tenant) {
             var data = {
                 name: name,
                 email: email,
-                instanceId: instanceId,
                 password: TokenManager.encode(password, schemaManager.schema.secret)
             };
             data[schemaManager.getTenantIdField()] = tenant.getId();
@@ -106,26 +103,28 @@ var RegistrationController = function(schemaManager) {
         }
     };
 
-    var loginUser = function(req) {
-        return function(tenant) {
-            var email = req.body.email;
-            var password = req.body.password;
-            var encodedPassword = TokenManager.encode(password, schemaManager.schema.secret);
+    var loginUser = function(req, tenant) {
+        var email = req.body.email;
+        var password = req.body.password;
+        var encodedPassword = TokenManager.encode(password, schemaManager.schema.secret);
 
-            var prepareResponse = function (user) {
-                var response = {
-                    user: user.public(),
-                    token: user.getToken(),
-                    instance_id: req.body.instance_id,
-                    eventBusRef: tenant.getFirebaseRef()
-                };
-                response[schemaManager.schema.multitenancy.entity] = tenant.public();
-                return response;
-            };
+        var prepareResponse = function(user) {
+            var response = {
+                user: user.public(),
+                token: user.getToken(),
+                instance_id: req.body.instance_id,
+                eventBusRef: tenant.g
+            }
+            response[schemaManager.schema.multitenancy.entity] = tenant.public();
+            return response;
+        };
 
-            return User.findByEmailAndPassword(email, encodedPassword, schemaManager)
-                       .then(prepareResponse);
-        }
+        User.findByEmailAndPassword(email, encodedPassword, schemaManager)
+            .then(prepareResponse)
+            .then(function(response) {
+                res.send(JSON.stringify(response));
+            })
+            .catch(respondWithError(res));
     };
 
     /**
@@ -141,10 +140,10 @@ var RegistrationController = function(schemaManager) {
                 .then(createTenant(params))
                 .then(addKongConsumer)
                 .then(addKongConsumerCredentials)
-                .then(addUserAccount(params.name, params.email, params.password, params.instance_id))
-                .then(loginUser(req))
-                .then(function(response) {
-                    res.send(JSON.stringify(response));
+                .then(addUserAccount(params.name, params.email, params.password))
+                .then(loginUser)
+                .then(function(tenant) {
+                    res.send(tenant.public());
                 })
                 .catch(EmailUniquenessError, respondWithError(res))
                 .catch(StatusCodeError, function(error) {
@@ -160,7 +159,6 @@ var RegistrationController = function(schemaManager) {
             respondWithError(res)(new InvalidEmailFormatError());
         }
     };
-
 
     router.post('/', registration);
     this.router = router;

@@ -1,14 +1,36 @@
 {
-  "name": "proximiio-darkness",
-  "version": "0.1.4",
-  "description": "Darkness API Framework.",
-  "main": "app.js",
-  "scripts": {
-    "docs": "./node_modules/.bin/jsdoc *.js middleware/*.js -d docs -r",
-    "test": "echo \"Error: no test specified\" && exit 1"
+  "_args": [
+    [
+      "proximiio-darkness@file:///Users/wired/mika/darkness",
+      "/Users/wired/mika/core"
+    ]
+  ],
+  "_from": "../darkness",
+  "_id": "proximiio-darkness@0.1.4",
+  "_inCache": true,
+  "_installable": true,
+  "_location": "/proximiio-darkness",
+  "_phantomChildren": {},
+  "_requested": {
+    "name": "proximiio-darkness",
+    "raw": "proximiio-darkness@file:///Users/wired/mika/darkness",
+    "rawSpec": "file:///Users/wired/mika/darkness",
+    "scope": null,
+    "spec": "/Users/wired/mika/darkness",
+    "type": "directory"
   },
-  "author": "Matej Drzik <matej.drzik@quanto.com>",
-  "license": "ISC",
+  "_requiredBy": [
+    "/"
+  ],
+  "_resolved": "file:../darkness",
+  "_shasum": "1a9e71efd6f4003181275a80a22429ac3cabe7a7",
+  "_shrinkwrap": null,
+  "_spec": "proximiio-darkness@file:///Users/wired/mika/darkness",
+  "_where": "/Users/wired/mika/core",
+  "author": {
+    "email": "matej.drzik@quanto.com",
+    "name": "Matej Drzik"
+  },
   "dependencies": {
     "bluebird": "^3.2.1",
     "body-parser": "^1.14.2",
@@ -31,8 +53,21 @@
     "underscore": "^1.8.3",
     "write-yaml": "^0.2.2"
   },
+  "description": "Darkness API Framework.",
   "devDependencies": {
-    "minami": "^1.1.1",
-    "jsdoc": "^3.4.0"
-  }
+    "jsdoc": "^3.4.0",
+    "minami": "^1.1.1"
+  },
+  "gitHead": "ecb2f634e7c9f95a6ebfad22013f2ab9a19d6198",
+  "license": "ISC",
+  "main": "app.js",
+  "name": "proximiio-darkness",
+  "optionalDependencies": {},
+  "readme": "# proximiio-darkness\n",
+  "readmeFilename": "README.md",
+  "scripts": {
+    "docs": "jsdoc *.js middleware/*.js -d docs -r",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "version": "0.1.4"
 }

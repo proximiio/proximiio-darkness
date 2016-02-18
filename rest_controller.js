@@ -88,16 +88,18 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
 
     this.show = (req, res) => {
         getEntity(req.params)
-            .then(validateOwnership)
+            .then(validateOwnership(req))
             .then(respond(req, res))
             .error(respondWithError);
     };
 
     let validateOwnership = (params) => {
-        if (req.tenant.validatesOwnership(params)) {
-            return params;
-        } else {
-            throw new OwnershipError();
+        return function(params) {
+            if (req.tenant.validatesOwnership(params)) {
+                return params;
+            } else {
+                throw new OwnershipError();
+            }
         }
     };
 
@@ -173,7 +175,7 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
             _this.extensions.overrides.create(req, res);
         } else {
             schemaModelHandler.checkParams(req.body)
-                .then(validateOwnership)
+                .then(validateOwnership(req))
                 .then(createEntity)
                 .then(getEntity)
                 .then(callExtensions(req, res, "create:after"))
@@ -193,7 +195,7 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
         params.updatedAt = (new Date()).toISOString();
 
         schemaModelHandler.checkParams(req.body)
-            .then(validateOwnership)
+            .then(validateOwnership(req))
             .then(updateEntity)
             .then(getEntity)
             .then(callExtensions(req, res, "update:after"))
@@ -204,7 +206,7 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
 
     this.destroy = (req, res) => {
         getEntity(req.params)
-            .then(validateOwnership(req.params))
+            .then(validateOwnership(req))
             .then(destroyEntity)
             .then(respond(req, res))
             .then(deleteElasticRecord(req))

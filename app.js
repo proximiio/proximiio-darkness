@@ -11,6 +11,7 @@ var SchemaExport = require('./schema_export');
 var AuthController = require('./auth_controller');
 var DynaAutoDiscovery = require('./dyna/autodiscovery');
 var listRoutes = require('./helpers/listRoutes');
+var User = require('./user');
 
 /**
  * Darkness Object
@@ -112,6 +113,19 @@ Darkness.start = function(schemaFilePath, callback) {
         Log.system('DarknessFramework', 'application', appSchema.name.cyan.bold, 'started');
         var __measureExecTime2 = process.hrtime(__measureExecTime);
         var __executionTime = `${__measureExecTitle} ${__measureExecTime2[0]}.${Math.round(__measureExecTime2[1]/(1000*1000))}s`;
+
+        var currentUser = function(req, res) {
+            User.findByToken(req.consumer.token, schemaManager).then(function(user) {
+                var response = user;
+                response[schemaManager.getTenantIdField()] = req[schemaManager.schema.multitenancy.entity];
+                res.send(JSON.stringify(response));
+            }).catch(function(error) {
+                res.send(JSON.stringify({error: error}));
+            });
+        };
+
+        app.get('/core/current_user', currentUser);
+
         var route, routes = [];
 
         app._router.stack.forEach(function(middleware){

@@ -1,3 +1,5 @@
+"use strict";
+
 var express = require('express');
 var router = express.Router();
 var pluralize = require('plur');
@@ -9,6 +11,8 @@ var capitalize = require('./helpers/capitalize')(); // extends String.prototype
 var SchemaHandler = require('./schema_model_handler');
 var Organization = require('./tenant');
 var ElasticAdapter = require('./elastic_adapter');
+var Promise = require('bluebird');
+var OwnershipError = require('./errors/ownershipError');
 
 var DEFAULT_LIMIT = 10;
 
@@ -25,14 +29,16 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
     var Model = this.datastore.table(this.plural);
     var elasticAdapter = new ElasticAdapter(schemaManager);
 
-    var hasExtensions = function(callback) {
-        var fileName = __dirname + '/extensions/' + pluralize(resource).capitalize() + 'Controller.js';
-        fs.access(fileName, fs.F_OK, function(error) {
+    var hasExtensions = (callback) => {
+        console.log('has extensions called');
+        var fileName = '/Users/wired/mika/core/extensions/' + pluralize(resource).capitalize() + 'Controller.js';
+        fs.access(fileName, fs.F_OK, (error) => {
+            console.log('has extensions found file', fileName);
             callback(error, fileName);
         });
     };
 
-    hasExtensions(function(error, fileName) {
+    hasExtensions((error, fileName) => {
         if (error) {
         } else {
             Log.d(TAG, 'loading extensions from path: ', fileName);
@@ -41,41 +47,17 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
         }
     });
 
-    var formatOutput = function(data) {
+    var formatOutput = (data) => {
         return JSON.stringify(data);
     };
 
-    var dbErrorHandler = function(res) {
-        return function(error) {
+    var dbErrorHandler = (res) => {
+        return (error) => {
             return res.status(500).send(JSON.stringify({error: error.message}));
         }
     };
 
-    var validationError = function(error, res) {
-        res.status(400).send(error);
-    };
-
-    var ownershipError = function(res) {
-        res.status(401).send("Tenant does not have access for this entity");
-    };
-
-    var validationErrorHandler = function(error, res, callback) {
-        if (error) {
-            res.status(400).send(error);
-        } else {
-            callback();
-        }
-    };
-
-    var authErrorHandler = function(error, res, callback) {
-        if (error) {
-            return res.status(401).send("Invalid Token");
-        } else {
-            callback();
-        }
-    };
-
-    this.index = function(req, res) {
+    this.index = (req, res) => {
         var limit = parseInt(req.query.limit) || DEFAULT_LIMIT;
         var skip = parseInt(req.query.skip) || 0;
         var order = req.query.order || 'id';
@@ -89,14 +71,13 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
              .filter(filter)
              .skip(skip)
              .limit(limit)
-             .run().then(function(result) {
+             .run().then((result) => {
                 res.send(formatOutput(result));
-             })
-             .error(dbErrorHandler(res));
+             })             .error(dbErrorHandler(res));
     };
 
-    this.count = function(req, res) {
-        Model.count().run().then(function(result) {
+    this.count = (req, res) => {
+        Model.count().run().then((result) => {
             if (result == null) {
                 res.status(404).send("Resource for count Not Found");
             } else {
@@ -105,21 +86,76 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
         }).error(dbErrorHandler(res));
     };
 
-    this.show = function(req, res) {
-        Model.get(req.params.id).run().then(function(result) {
-            if (result == null) {
-                res.status(404).send("Resource Not Found");
-            } else {
-                if (req.organization.validatesOwnership(result)) {
-                    res.send(formatOutput(result));
-                } else {
-                    ownershipError(res);
-                }
-            }
-        }).error(dbErrorHandler(res));
+    this.show = (req, res) => {
+        getEntity(req.params)
+            .then(validateOwnership)
+            .then(respond(req, res))
+            .error(respondWithError);
     };
 
-    this.create = function(req, res) {
+    let validateOwnership = (params) => {
+        if (req.tenant.validatesOwnership(params)) {
+            return params;
+        } else {
+            throw new OwnershipError();
+        }
+    };
+
+    let getEntity = (params) => {
+        return Model.get(params.id).run();
+    };
+
+    let createEntity = (params) => {
+        return Model.insert(params).run().then(function (result) {
+            params.id = result.generated_keys[0];
+            return params;
+        });
+    };
+
+    let updateEntity = (params) => {
+        return getEntity(params).update(params)
+            .then((result) => {
+                return params;
+            });
+    };
+
+    let updateElasticRecord = (req) => {
+        return (data) => {
+            elasticAdapter.update(resource, data, req.tenant.id);
+            return data;
+        }
+    };
+
+    let deleteElasticRecord = (req) => {
+        return (data) => {
+            elasticAdapter.delete(resource, data.id, req.tenant.id);
+            return data;
+        }
+    };
+
+    let callExtensions = (req, res, callbackType) => {
+        return (data) => {
+            if (typeof (_this.extensions) != 'undefined' && _this.extensions.callbackExists(callbackType)) {
+                return _this.extensions.callback(callbackType, req, res, data);
+            } else {
+                return data;
+            }
+        };
+    };
+
+    var respond = (req, res) => {
+        return (params) => {
+            res.send(formatOutput(params));
+            return params;
+        }
+    };
+
+    var respondWithError = (error) => {
+        console.log('respond with error', error);
+        res.status(500).send(JSON.stringify({error: error.message}));
+    };
+
+    this.create = (req, res) => {
         var params = req.body;
         if (typeof params['id'] != "undefined") {
             delete params['id'];
@@ -129,31 +165,25 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
         params.createdAt = new Date().toISOString();
         params.updatedAt = params.createdAt;
 
-        schemaModelHandler.extractAndValidateParams(params, function(err, params) {
-            validationErrorHandler(err, res, function() {
-                Model.insert(params).run().then(function(result) {
-                    params.id = result.generated_keys[0];
-
-                    var extensionsCallback = function(data) {
-                        res.send(formatOutput(data));
-                        if (schemaManager.multitenancy) {
-                            elasticAdapter.update(data, req.tenant.id);
-                        } else {
-                            elasticAdapter.update(data);
-                        }
-                    };
-
-                    if (typeof (_this.extensions) != 'undefined' && _this.extensions.callbackExists('create:after')) {
-                        _this.extensions.callback('create:after', req, res, params, extensionsCallback);
-                    } else {
-                        extensionsCallback(params);
-                    }
-                }).error(dbErrorHandler(res));
-            });
-        });
+        console.log('events create, ext', _this.extensions);
+        if (typeof _this.extensions != 'undefined' &&
+            _this.extensions.hasOwnProperty('overrides') &&
+            _this.extensions.overrides.hasOwnProperty('create')) {
+            console.log('action CREATE for resource:', resource, 'overriden');
+            _this.extensions.overrides.create(req, res);
+        } else {
+            schemaModelHandler.checkParams(req.body)
+                .then(validateOwnership)
+                .then(createEntity)
+                .then(getEntity)
+                .then(callExtensions(req, res, "create:after"))
+                .then(respond(req, res))
+                .then(updateElasticRecord(req))
+                .error(respondWithError);
+        }
     };
 
-    this.update = function(req, res) {
+    this.update = (req, res) => {
         var params = req.body;
 
         if (schemaManager.multitenancy) {
@@ -161,37 +191,27 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
         }
 
         params.updatedAt = (new Date()).toISOString();
-        schemaModelHandler.extractAndValidateParams(params, function(err, params) {
-            validationErrorHandler(err, res, function() {
-                Model.get(params.id).run().then(function(result) {
-                    if (req.tenant.validatesOwnership(result)) {
-                        Model.get(params.id).update(params).then(function(saveResult) {
-                            Model.get(params.id).run().then(function(updated) {
-                                var extensionsCallback = function(data) {
-                                    res.send(formatOutput(updated));
-                                    if (schemaManager.multitenancy) {
-                                        elasticAdapter.update(updated, req.tenant.id);
-                                    } else {
-                                        elasticAdapter.update(updated);
-                                    }
-                                }
 
-                                if (typeof (_this.extensions) != 'undefined' && _this.extensions.callbackExists('update:after')) {
-                                    _this.extensions.callback('update:after', req, res, params, extensionsCallback);
-                                } else {
-                                    extensionsCallback(updated);
-                                }
-                            })
-                        }).error(dbErrorHandler(res));
-                    } else {
-                        ownershipError(res);
-                    }
-                }).error(dbErrorHandler(res));
-            });
-        });
+        schemaModelHandler.checkParams(req.body)
+            .then(validateOwnership)
+            .then(updateEntity)
+            .then(getEntity)
+            .then(callExtensions(req, res, "update:after"))
+            .then(respond(req, res))
+            .then(updateElasticRecord(req))
+            .error(respondWithError);
     };
 
-    this.upsert = function(req, res) {
+    this.destroy = (req, res) => {
+        getEntity(req.params)
+            .then(validateOwnership(req.params))
+            .then(destroyEntity)
+            .then(respond(req, res))
+            .then(deleteElasticRecord(req))
+            .error(respondWithError);
+    };
+
+    this.upsert = (req, res) => {
         if (req.body.id != null &&
             req.body.id != "null" &&
             req.body.id != "new" &&
@@ -202,27 +222,13 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
         }
     };
 
-    this.delete = function(req, res) {
-        Model.get(req.params.id).run().then(function(result) {
-            if (req.tenant.validatesOwnership(result)) {
-                Model.get(req.params.id).delete().run().then(function(deleteResult) {
-                    result.isDeleted = true;
-                    res.send(formatOutput(result));
-                    elasticAdapter.delete(req.params.id, req.organization.id);
-                });
-            } else {
-                ownershipErrorHandle(res);
-            }
-        }).error(dbErrorHandler());
-    };
-
     router.get('/' + this.plural, this.index);
     router.get('/' + this.plural + '/count', this.count);
     router.get('/' + this.plural + '/:id', this.show);
     router.post('/' + this.plural, this.create);
     router.put('/' + this.plural, this.upsert);
     router.put('/' + this.plural + '/:id', this.update);
-    router.delete('/' + this.plural + '/:id', this.delete);
+    router.delete('/' + this.plural + '/:id', this.destroy);
 
     this.router = router;
 

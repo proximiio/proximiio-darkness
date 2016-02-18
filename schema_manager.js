@@ -4,6 +4,7 @@ var SchemaToSwagger = require('./schema_to_swagger');
 var RethinkManager = require('./rethink_manager');
 var RestController = require('./rest_controller');
 var SchemaModelHandler = require('./schema_model_handler');
+var ElasticAdapter = require('./elastic_adapter');
 var bluebird = require('bluebird');
 var redis = require('redis');
 bluebird.promisifyAll(redis.RedisClient.prototype);
@@ -43,6 +44,8 @@ module.exports = function SchemaManager(schema, environment) {
         this.storage = require('rethinkdbdash')(this.datastoreSettings);
         this.storageManager = new RethinkManager(_this);
     }
+
+    this.elasticAdapter = new ElasticAdapter(this);
 
     this.settings = function() {
         return _this.schema.settings[this.environment];

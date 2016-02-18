@@ -30,10 +30,8 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
     var elasticAdapter = new ElasticAdapter(schemaManager);
 
     var hasExtensions = (callback) => {
-        console.log('has extensions called');
-        var fileName = '/Users/wired/mika/core/extensions/' + pluralize(resource).capitalize() + 'Controller.js';
+        var fileName = schemaManager.schema.filePath + '/extensions/' + pluralize(resource).capitalize() + 'Controller.js';
         fs.access(fileName, fs.F_OK, (error) => {
-            console.log('has extensions found file', fileName);
             callback(error, fileName);
         });
     };
@@ -93,7 +91,7 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
             .error(respondWithError);
     };
 
-    let validateOwnership = (params) => {
+    let validateOwnership = (req) => {
         return function(params) {
             if (req.tenant.validatesOwnership(params)) {
                 return params;
@@ -104,7 +102,7 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
     };
 
     let getEntity = (params) => {
-        return Model.get(params.id).run();
+        return Model.get(params.id);
     };
 
     let createEntity = (params) => {
@@ -119,6 +117,20 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
             .then((result) => {
                 return params;
             });
+    };
+
+    let destroyEntity = (params) => {
+        return getEntity(params).delete().then((result) => {
+            params.isDeleted = true;
+            return params;
+        });
+    };
+
+    let updateElasticRecord = (req) => {
+        return (data) => {
+            elasticAdapter.update(resource, data, req.tenant.id);
+            return data;
+        }
     };
 
     let updateElasticRecord = (req) => {
@@ -167,11 +179,9 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
         params.createdAt = new Date().toISOString();
         params.updatedAt = params.createdAt;
 
-        console.log('events create, ext', _this.extensions);
         if (typeof _this.extensions != 'undefined' &&
             _this.extensions.hasOwnProperty('overrides') &&
             _this.extensions.overrides.hasOwnProperty('create')) {
-            console.log('action CREATE for resource:', resource, 'overriden');
             _this.extensions.overrides.create(req, res);
         } else {
             schemaModelHandler.checkParams(req.body)

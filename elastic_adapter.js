@@ -1,7 +1,7 @@
 var Log = require('./logger');
 var Promise = require("bluebird");
 var request = Promise.promisify(require("request"));
-var pluralize = require('plur');
+
 Promise.promisifyAll(request);
 
 /**
@@ -69,7 +69,8 @@ var ElasticAdapter = function(schemaManager) {
     /**
      * returns elastic record path with respect to multitenancy config
      *
-     * @param id {String} Resource UUID
+     * @param {String} resource
+     * @param {String}id
      * @param [tenantId] {String} Tenant ID/UUID
      * @returns {string}
      */
@@ -78,14 +79,15 @@ var ElasticAdapter = function(schemaManager) {
         if (schemaManager.multitenancy) {
             index += '-' + tenantId;
         }
-        return schemaManager.schema.elasticsearch.root + '/' + index + '/' + pluralize(resource) + '/' + id;
+        return schemaManager.schema.elasticsearch.root + '/' + index + '/' + resource + '/' + id;
     };
 
 
     /**
      * updates elasticsearch record
      *
-     * @param data
+     * @param {String} resource
+     * @param {Object} data
      * @param [tenantId] {String} Tenant ID/UUID
      * @param [callback]
      */

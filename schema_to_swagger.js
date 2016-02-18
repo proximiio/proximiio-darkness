@@ -238,6 +238,10 @@ module.exports = {
             }
         });
 
+        _.each(Object.keys(appSchema.endpoints), function(endpoint) {
+            swagger.paths[endpoint] = appSchema.endpoints[endpoint];
+        });
+
         return swagger;
     }
 };

@@ -133,13 +133,6 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
         }
     };
 
-    let updateElasticRecord = (req) => {
-        return (data) => {
-            elasticAdapter.update(resource, data, req.tenant.id);
-            return data;
-        }
-    };
-
     let deleteElasticRecord = (req) => {
         return (data) => {
             elasticAdapter.delete(resource, data.id, req.tenant.id);

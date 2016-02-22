@@ -13,8 +13,9 @@ var Organization = require('./tenant');
 var ElasticAdapter = require('./elastic_adapter');
 var Promise = require('bluebird');
 var OwnershipError = require('./errors/ownershipError');
+var NotFoundError = require('./errors/notFoundError');
 
-var DEFAULT_LIMIT = 10;
+var DEFAULT_LIMIT = 1000;
 
 module.exports = function RestController(resource, schemaModelHandler, datastore, schemaManager) {
     var _this = this;
@@ -88,11 +89,13 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
         getEntity(req.params)
             .then(validateOwnership(req))
             .then(respond(req, res))
-            .error(respondWithError);
+            .catch(respondWithError(res))
+            .error(respondWithError(res));
     };
 
     let validateOwnership = (req) => {
         return function(params) {
+            console.log('received params: ', params);
             if (req.tenant.validatesOwnership(params)) {
                 return params;
             } else {
@@ -102,25 +105,35 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
     };
 
     let getEntity = (params) => {
-        return Model.get(params.id);
+        console.log('getEntity', params);
+        return Model.get(params.id).then(function(result) {
+          if (result == null) {
+             throw new NotFoundError();
+          } else {
+             console.log('getEntity returning ', result);
+             return result;
+          }
+        });
     };
 
     let createEntity = (params) => {
-        return Model.insert(params).run().then(function (result) {
+        return Model.insert(params).then(function (result) {
             params.id = result.generated_keys[0];
+            console.log('created record', params);
             return params;
         });
     };
 
     let updateEntity = (params) => {
-        return getEntity(params).update(params)
+        console.log('update entity with params:', params);
+        return Model.get(params.id).update(params)
             .then((result) => {
                 return params;
             });
     };
 
     let destroyEntity = (params) => {
-        return getEntity(params).delete().then((result) => {
+        return Model.get(params.id).delete().then((result) => {
             params.isDeleted = true;
             return params;
         });
@@ -128,6 +141,7 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
 
     let updateElasticRecord = (req) => {
         return (data) => {
+            console.log('should update elastic record with tenant id', req.tenant.id, 'data', data);
             elasticAdapter.update(resource, data, req.tenant.id);
             return data;
         }
@@ -152,14 +166,21 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
 
     var respond = (req, res) => {
         return (params) => {
+            console.log('should respond:', params);
             res.send(formatOutput(params));
             return params;
         }
     };
 
-    var respondWithError = (error) => {
-        console.log('respond with error', error);
-        res.status(500).send(JSON.stringify({error: error.message}));
+    var respondWithError = (res) => {
+        return (error) => {
+          console.log('respond with error', error);
+          if (error.code == 404) {
+            res.status(404).send(error.message);
+          } else {
+            res.status(500).send(JSON.stringify({error: error.message}));
+          }
+        }
     };
 
     this.create = (req, res) => {
@@ -184,7 +205,8 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
                 .then(callExtensions(req, res, "create:after"))
                 .then(respond(req, res))
                 .then(updateElasticRecord(req))
-                .error(respondWithError);
+                .catch(respondWithError(res))
+                .error(respondWithError(res));
         }
     };
 
@@ -201,19 +223,22 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
             .then(validateOwnership(req))
             .then(updateEntity)
             .then(getEntity)
-            .then(callExtensions(req, res, "update:after"))
-            .then(respond(req, res))
             .then(updateElasticRecord(req))
-            .error(respondWithError);
+            .then(respond(req, res))
+            .then(callExtensions(req, res, "update:after"))
+            .catch(respondWithError(res))
+            .error(respondWithError(res));
     };
 
     this.destroy = (req, res) => {
         getEntity(req.params)
             .then(validateOwnership(req))
             .then(destroyEntity)
+            .then(callExtensions(req, res, "delete:after"))
             .then(respond(req, res))
             .then(deleteElasticRecord(req))
-            .error(respondWithError);
+            .catch(respondWithError(res))
+            .error(respondWithError(res));
     };
 
     this.upsert = (req, res) => {
@@ -221,8 +246,10 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
             req.body.id != "null" &&
             req.body.id != "new" &&
             typeof req.body.id != 'undefined') {
+            console.log('upsert calling update');
             _this.update(req, res);
         } else {
+            console.log('upsert calling insert');
             _this.create(req ,res);
         }
     };

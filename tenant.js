@@ -146,7 +146,7 @@ var Tenant = function(tenant, schemaManager) {
      * @returns {boolean}
      */
     this.validatesOwnership = function(entity) {
-        return entity[schemaManager.schema.multitenancy.entity + '_id'] == this.data.id;
+        return entity[schemaManager.schema.multitenancy.entity + '_id'] == _this.data.id;
     };
 
     /**

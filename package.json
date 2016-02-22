@@ -1,32 +1,4 @@
 {
-  "_args": [
-    [
-      "proximiio-darkness@file:///Users/wired/mika/darkness",
-      "/Users/wired/mika/core"
-    ]
-  ],
-  "_from": "../darkness",
-  "_id": "proximiio-darkness@0.1.4",
-  "_inCache": true,
-  "_installable": true,
-  "_location": "/proximiio-darkness",
-  "_phantomChildren": {},
-  "_requested": {
-    "name": "proximiio-darkness",
-    "raw": "proximiio-darkness@file:///Users/wired/mika/darkness",
-    "rawSpec": "file:///Users/wired/mika/darkness",
-    "scope": null,
-    "spec": "/Users/wired/mika/darkness",
-    "type": "directory"
-  },
-  "_requiredBy": [
-    "/"
-  ],
-  "_resolved": "file:../darkness",
-  "_shasum": "1a9e71efd6f4003181275a80a22429ac3cabe7a7",
-  "_shrinkwrap": null,
-  "_spec": "proximiio-darkness@file:///Users/wired/mika/darkness",
-  "_where": "/Users/wired/mika/core",
   "author": {
     "email": "matej.drzik@quanto.com",
     "name": "Matej Drzik"

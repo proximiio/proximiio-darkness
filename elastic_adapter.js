@@ -93,6 +93,7 @@ var ElasticAdapter = function(schemaManager) {
      */
 
     this.update = function(resource, data, tenantId, callback) {
+        console.log('updating elasticsearch with ', data, ' tenantId', tenantId);
         if (available(data.id, tenantId)) {
             var requestData = {url: path(resource, data.id, tenantId), body: JSON.stringify(data)};
             request.putAsync(requestData)

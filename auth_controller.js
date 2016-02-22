@@ -1,3 +1,5 @@
+"use strict";
+
 var express = require('express');
 var router = express.Router();
 var Tenant = require('./tenant');
@@ -105,12 +107,23 @@ module.exports = function RestController(schemaManager) {
               .then(respond);
     };
 
+    var tokens = (req, res) => {
+        var tokens = req.tenant.data.tokens;
+        var credentials = req.tenant.getConsumerCredentials();
+        var decrypted = [];
+        tokens.forEach((token) => {
+            decrypted.push(TokenManager.decode(token, credentials));
+        });
+        res.send(JSON.stringify(decrypted));
+    };
+
     var registrationController = new RegistrationController(schemaManager);
 
     router.post('/login', login);
     router.post('/logout', logout);
     router.post('/authorize', authorize);
     router.get('/', currentUser);
+    router.get('/tokens', tokens);
     router.use('/registration', registrationController.router);
 
     this.router = router;

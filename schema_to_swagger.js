@@ -239,7 +239,9 @@ module.exports = {
         });
 
         _.each(Object.keys(appSchema.endpoints), function(endpoint) {
-            swagger.paths[endpoint] = appSchema.endpoints[endpoint];
+            _.each(Object.keys(appSchema.endpoints[endpoint]), function(path) {
+              swagger.paths[path] = appSchema.endpoints[endpoint][path];
+            })
         });
 
         return swagger;

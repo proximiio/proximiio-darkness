@@ -123,7 +123,7 @@ module.exports = {
             }
         };
 
-        swagger.paths[appSchema.publicRoot + "/registration"] = {
+        swagger.paths[appSchema.authRoot + "/registration"] = {
             post: {
                 tags: ["[Auth System]"],
                 description: "Registration action",

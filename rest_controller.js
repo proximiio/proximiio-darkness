@@ -14,6 +14,7 @@ var ElasticAdapter = require('./elastic_adapter');
 var Promise = require('bluebird');
 var OwnershipError = require('./errors/ownershipError');
 var NotFoundError = require('./errors/notFoundError');
+var requestPromise = require('request-promise');
 
 var DEFAULT_LIMIT = 1000;
 
@@ -166,8 +167,9 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
 
     var respond = (req, res) => {
         return (params) => {
-            console.log('should respond:', params);
+            console.log('should respond:', formatOutput(params));
             res.send(formatOutput(params));
+            console.log('response sent');
             return params;
         }
     };
@@ -178,11 +180,40 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
           if (error.code == 404) {
             res.status(404).send(error.message);
           } else {
-            res.status(500).send(JSON.stringify({error: error.message}));
+            res.status(500).send(JSON.stringify(error));
           }
         }
     };
 
+    let emitConfigChange = (req, action) => {
+      return (params) => {
+        var event = {
+          event: 'config-change',
+          data: {
+              operation: action,
+              target: params.id,
+              type: resource
+          },
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }
+        event[schemaManager.getTenantIdField()] = req.consumer.id;
+
+        return requestPromise({
+          uri: 'https://api.proximi.fi/core/events',
+          method: 'POST',
+          headers: {
+              'Authorization': req.headers.authorization,
+              'x-authorization-request-issuer': schemaManager.schema.name + ' (' + schemaManager.schema.version + ')'
+          },
+          json: true,
+          body: event
+        }).then((response) => {
+          return params;
+        }); 
+      }
+    };
+ 
     this.create = (req, res) => {
         var params = req.body;
         if (typeof params['id'] != "undefined") {
@@ -203,8 +234,9 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
                 .then(createEntity)
                 .then(getEntity)
                 .then(callExtensions(req, res, "create:after"))
-                .then(respond(req, res))
                 .then(updateElasticRecord(req))
+                .then(emitConfigChange(req, 'create'))
+                .then(respond(req, res))
                 .catch(respondWithError(res))
                 .error(respondWithError(res));
         }
@@ -217,15 +249,20 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
             params[schemaManager.getTenantIdField()] = req.tenant.id;
         }
 
+        if (typeof params.id == "undefined") {
+          params.id = req.params.id;
+        }
+
         params.updatedAt = (new Date()).toISOString();
 
-        schemaModelHandler.checkParams(req.body)
+        schemaModelHandler.checkParams(req.body, true)
             .then(validateOwnership(req))
             .then(updateEntity)
             .then(getEntity)
-            .then(updateElasticRecord(req))
-            .then(respond(req, res))
             .then(callExtensions(req, res, "update:after"))
+            .then(updateElasticRecord(req))
+            .then(emitConfigChange(req, 'update'))
+            .then(respond(req, res))
             .catch(respondWithError(res))
             .error(respondWithError(res));
     };
@@ -234,6 +271,7 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
         getEntity(req.params)
             .then(validateOwnership(req))
             .then(destroyEntity)
+            .then(emitConfigChange(req, 'delete'))
             .then(callExtensions(req, res, "delete:after"))
             .then(respond(req, res))
             .then(deleteElasticRecord(req))

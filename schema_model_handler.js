@@ -22,9 +22,11 @@ module.exports = function SchemaModelHandler(schema) {
         jschema.validate(object, this.schema, callback);
     };
 
-    this.checkParams = function(object) {
+    this.checkParams = function(object, isUpdate) {
+        if (typeof isUpdate == "undefined") isUpdate = false;
+
         return new Promise(function(resolve, reject) {
-            var extracted = _this.extractProperties(object);
+            var extracted = _this.extractProperties(object, isUpdate);
             _this.validate(extracted, function(error) {
                 if (error) {
                     reject(error);
@@ -46,12 +48,14 @@ module.exports = function SchemaModelHandler(schema) {
         });
     };
 
-    this.extractProperties = function(object) {
+    this.extractProperties = function(object, isUpdate) {
         var result = {};
         _.each(this.propertiesArray, function(property) {
-            result[property] = object[property];
+            if (typeof object[property] != 'undefined') {
+              result[property] = object[property];
+            }
         });
-        if (typeof result['id'] == 'undefined') {
+        if (typeof result['id'] == 'undefined' && !isUpdate) {
             delete result['id'];
         }
         return result;

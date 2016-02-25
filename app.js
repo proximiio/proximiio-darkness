@@ -42,11 +42,24 @@ Darkness.start = function(schemaFilePath, callback) {
     app.schemaManager = schemaManager;
 
     let setMiddleware = (app) => {
+	app.use(function(req, res, next) {
+	  req.headers['content-type'] = req.headers['content-type'] || 'application/json';
+//          if (req.path != '/core_auth/login' || req.path != '/core_auth/registration') { 
+  //          req.headers['content-type'] = 'application/json';
+    //      }
+          console.log('req headers content-type set to:', req.headers['content-type']);
+	  next();
+	});
         var bodyParser = require('body-parser');
         app.use(express.static(__dirname + '/public'));
         app.use(bodyParser.urlencoded({ extended: true }));
         app.use(bodyParser.json());
         app.use(require('./request_logger'));
+        //app.use(require('./middleware/contentTypeManager.js'));
+	app.use(function (req, res, next) {
+	  res.header("Content-Type",'application/json');
+	  next();
+	});
         app.use(require('./middleware/whitelist')(appSchema.urlWhitelist));
 
         if (appSchema.apiRouter.enabled && appSchema.apiRouter.type == 'kong') {

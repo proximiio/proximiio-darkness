@@ -1,3 +1,4 @@
+"use strict";
 var Promise = require('bluebird');
 var express = require('express');
 var router = express.Router();
@@ -7,11 +8,11 @@ var InvalidEmailFormatError = require(__dirname + '/errors/invalidEmailFormatErr
 var EmailUniquenessError = require(__dirname + '/errors/emailUniquenessError');
 var StatusCodeError = require(__dirname + '/errors/statusCodeError');
 var DarkError = require(__dirname + '/errors/darkError');
-
 var KongManager = require(__dirname + '/kong_manager');
 var TokenManager = require(__dirname + '/token_manager');
 var Tenant = require(__dirname + '/tenant');
 var User = require(__dirname + '/user');
+var requestPromise = require('request-promise');
 
 var RegistrationController = function(schemaManager) {
     var _this = this;
@@ -25,7 +26,8 @@ var RegistrationController = function(schemaManager) {
      */
     var respondWithError = function(res) {
         return function(error) {
-            res.status(error.code).send(error.json);
+            console.log('should respond with error', error);
+            res.status(500).send(error.json);
         };
     };
 
@@ -76,6 +78,7 @@ var RegistrationController = function(schemaManager) {
      */
     var addUserAccount = function(name, email, password) {
         return function(tenant) {
+            console.log('adding user account:', email, ' pass:', password);
             var data = {
                 name: name,
                 email: email,
@@ -99,32 +102,53 @@ var RegistrationController = function(schemaManager) {
 
             return user.save()
                        .then(assignTokenToUser)
-                       .then(assignTokenToTenant);
+                       .then(assignTokenToTenant)
+                       .then((result) => {
+                         console.log('add user account ready, returning tenant:', tenant);
+                         return tenant;
+                       });
         }
     };
 
-    var loginUser = function(req, tenant) {
-        var email = req.body.email;
-        var password = req.body.password;
-        var encodedPassword = TokenManager.encode(password, schemaManager.schema.secret);
+    var loginUser = function(req, params) {
+        console.log('loginUserX params:', params);
+        var original = params.password;
+        return (tenant) => {
+          console.log('logging in user with email: ', params.email, ' password: ' , original);
+          var encodedPassword = TokenManager.encode(original, schemaManager.schema.secret);
 
-        var prepareResponse = function(user) {
-            var response = {
+          var prepareResponse = function(user) {
+              console.log('user loaded', user, ' preparing response');
+              var response = {
                 user: user.public(),
                 token: user.getToken(),
-                instance_id: req.body.instance_id,
-                eventBusRef: tenant.g
-            }
-            response[schemaManager.schema.multitenancy.entity] = tenant.public();
-            return response;
-        };
+                instance_id: req.body.instance_id
+              }
+              response[schemaManager.schema.multitenancy.entity] = tenant.public();
+              return response;
+          };
 
-        User.findByEmailAndPassword(email, encodedPassword, schemaManager)
-            .then(prepareResponse)
-            .then(function(response) {
-                res.send(JSON.stringify(response));
-            })
-            .catch(respondWithError(res));
+          return User.findByEmailAndPassword(params.email, encodedPassword, schemaManager)
+                     .then(prepareResponse)
+        }
+    };
+
+    let addApplication = function(tenant) {
+        var application = {name: 'Default Application'};
+        return requestPromise({
+          uri: 'https://api.proximi.fi/core/applications',
+          method: 'POST',
+          headers: {
+              'Authorization': 'Bearer ' + tenant.data.tokens[0],
+              'x-authorization-request-issuer': schemaManager.schema.name + ' (' + schemaManager.schema.version + ')'
+          },
+          json: true,
+          body: application
+        }).then((response) => {
+          console.log('application added with result:', response);
+          console.log('returning tenant', tenant);
+          return tenant;
+        });
     };
 
     /**
@@ -141,10 +165,12 @@ var RegistrationController = function(schemaManager) {
                 .then(addKongConsumer)
                 .then(addKongConsumerCredentials)
                 .then(addUserAccount(params.name, params.email, params.password))
-                .then(loginUser)
-                .then(function(tenant) {
-                    res.send(tenant.public());
+                .then(addApplication)
+                .then(loginUser(req, params))
+                .then(function(response) {
+                    res.send(response);
                 })
+                .error(respondWithError(res))
                 .catch(EmailUniquenessError, respondWithError(res))
                 .catch(StatusCodeError, function(error) {
                     respondWithError(res)(new StatusCodeError(error.statusCode, error.message))

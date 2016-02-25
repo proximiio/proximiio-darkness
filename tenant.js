@@ -157,7 +157,8 @@ var Tenant = function(tenant, schemaManager) {
     this.public = function() {
         return {
             id: _this.data.id,
-            name: _this.data.name
+            name: _this.data.name,
+            eventBusRef: schemaManager.settings().firebase.ref + '/' + schemaManager.getTenantEntityPlural() + '/' + _this.data.id + ''
         }
     };
 
@@ -168,6 +169,7 @@ var Tenant = function(tenant, schemaManager) {
      */
     this.save = function() {
         if (typeof _this.data.id == 'undefined') {
+           console.log('inserting tenant', _this.data);
             // create
             _this.data.createdAt = new Date().toISOString();
             _this.data.updatedAt = _this.data.createdAt;
@@ -178,6 +180,7 @@ var Tenant = function(tenant, schemaManager) {
                 return _this;
             });
         } else {
+            console.log('updating tenant', _this.data, ' token count:', _this.data.tokens.length);
             // update
             return storage.get(_this.data.id).update(_this.data).run().then(function(results) {
                 return _this;

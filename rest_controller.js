@@ -255,7 +255,11 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
 
         params.updatedAt = (new Date()).toISOString();
 
-        schemaModelHandler.checkParams(req.body, true)
+        getEntity(req.body)
+            .then((entity) => {
+                Object.assign(entity, params);
+                return schemaModelHandler.checkParams(entity, true);
+            })
             .then(validateOwnership(req))
             .then(updateEntity)
             .then(getEntity)

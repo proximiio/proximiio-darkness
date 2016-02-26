@@ -159,6 +159,7 @@ var RegistrationController = function(schemaManager) {
      */
     var registration = function(req, res) {
         var params = req.body;
+        params.name = params.last_name + " " + params.first_name;
         if (emailValidator.format(params.email)) {
             emailValidator.uniqueness(schemaManager, params.email)
                 .then(createTenant(params))

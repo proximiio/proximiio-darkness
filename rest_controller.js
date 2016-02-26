@@ -77,7 +77,7 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
     };
 
     this.count = (req, res) => {
-        Model.count().run().then((result) => {
+        Model.filter({organization_id: req.tenant.id}).count().run().then((result) => {
             if (result == null) {
                 res.status(404).send("Resource for count Not Found");
             } else {

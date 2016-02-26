@@ -37,7 +37,7 @@ var Tenant = function(tenant, schemaManager) {
      * @returns {String}
      */
     this.getName = function() {
-        return _this.data.name;
+        return _this.data.company;
     };
 
     /**
@@ -156,8 +156,11 @@ var Tenant = function(tenant, schemaManager) {
      */
     this.public = function() {
         return {
-            id: _this.data.id,
-            name: _this.data.name,
+            id: _this.getId(),
+            name: _this.getName(),
+            background: _this.data.background,
+            country: _this.data.country,
+            email: _this.data.email,
             eventBusRef: schemaManager.settings().firebase.ref + '/' + schemaManager.getTenantEntityPlural() + '/' + _this.data.id + ''
         }
     };
@@ -220,6 +223,21 @@ var Tenant = function(tenant, schemaManager) {
     this.generateApplicationToken = function(applicationId) {
         var credentials = TokenManager.decode(_this.data.consumerCredentials, schemaManager.schema.secret);
         return TokenManager.applicationToken(credentials.key, credentials.secret, applicationId);
+    };
+
+    this.decodeTokens = function() {
+        var decoded = [];
+        var credentials = TokenManager.decode(_this.data.consumerCredentials, schemaManager.schema.secret);
+        console.log('token count:', _this.data.tokens.length, _this.data.tokens);
+        _this.data.tokens.forEach((token) => {
+          var tokenObject = {};
+          tokenObject[token] = TokenManager.decode(token, credentials.secret);
+          delete tokenObject[token].typ;
+          delete tokenObject[token].iss;
+          delete tokenObject[token].alg; 
+          decoded.push(tokenObject);
+        }); 
+        return decoded;
     };
 
     this.getData = function() {

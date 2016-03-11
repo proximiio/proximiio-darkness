@@ -15,9 +15,11 @@ var extend = require('extend');
  *
  */
 
-var DynaMethod = function(method) {
+var DynaMethod = function(method, schemaManager) {
 
     var _this = this;
+
+    this.schemaManager = schemaManager;
 
     this.extension = method;
 
@@ -57,7 +59,7 @@ var DynaMethod = function(method) {
         var _this = this;
         return new Promise((resolve, reject) => {
             try {
-                _this.extension.execute(req.body, resolve, reject);
+                _this.extension.execute(req.body, resolve, reject, schemaManager);
             } catch (error) {
                 console.log('dynamethod catch', error);
                 reject(error);
@@ -90,9 +92,9 @@ var DynaMethod = function(method) {
     return this;
 };
 
-DynaMethod.hookFactory = (endPoint, method) => {
+DynaMethod.hookFactory = (endPoint, method, schemaManager) => {
     var schema = require(process.cwd() + `/extensions/dyna/${endPoint}/${method.desc().id}`);
-    var dynaMethod = new DynaMethod(schema);
+    var dynaMethod = new DynaMethod(schema, schemaManager);
     return dynaMethod.requestHook;
 };
 

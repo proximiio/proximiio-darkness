@@ -109,8 +109,7 @@ Darkness.start = function(schemaFilePath, callback) {
             .then(function(dynaRouters) {
                 "use strict";
                 dynaRouters.forEach((dynaRouter) => {
-                    app.use('/geo', dynaRouter.router);
-                    listRoutes(dynaRouter.router);
+		    app.use('/' + dynaRouter.endPoint, dynaRouter.router);
                 });
                 return app;
             });

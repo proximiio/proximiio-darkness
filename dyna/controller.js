@@ -46,8 +46,11 @@ var DynaController = function(endPoint, schemaManager) {
             let method = require(filePath);
             let id = method.desc().id;
             var mountPath = '/' + id;
-            log(mountPath);
-            router.post(mountPath, DynaMethod.hookFactory(endPoint, method));
+            if (method.desc().hasOwnProperty('method') && method.desc().method == 'get') {
+                router.get(mountPath, DynaMethod.hookFactory(endPoint, method, schemaManager));
+            } else {
+                router.post(mountPath, DynaMethod.hookFactory(endPoint, method, schemaManager));
+            }
         });
         return {
             endPoint: endPoint,

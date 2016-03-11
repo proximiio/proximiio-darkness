@@ -15,7 +15,7 @@ var DynaAutodiscovery = function(schemaManager) {
         try {
             fs.accessSync(srcpath, fs.F_OK);
             return fs.readdirSync(srcpath).filter(function(file) {
-                return fs.statSync(srcpath.join(srcpath, file)).isDirectory();
+                return fs.statSync([srcpath, file].join('')).isDirectory();
             });
         } catch (e) {
             return [];
@@ -23,7 +23,7 @@ var DynaAutodiscovery = function(schemaManager) {
 
     };
 
-    let dynas = getDirectories('./extensions/dyna/');
+    let dynas = getDirectories(process.cwd() + '/extensions/dyna/');
 
     let endpointPromises = [];
 

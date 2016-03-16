@@ -59,7 +59,7 @@ var DynaMethod = function(method, schemaManager) {
         var _this = this;
         return new Promise((resolve, reject) => {
             try {
-                _this.extension.execute(req.body, resolve, reject, schemaManager);
+                _this.extension.execute(method.desc().method == 'get' ? req.query : req.body, resolve, reject, schemaManager, req.tenant, req);
             } catch (error) {
                 console.log('dynamethod catch', error);
                 reject(error);
@@ -70,11 +70,10 @@ var DynaMethod = function(method, schemaManager) {
     this.schema = () => {
         var parameters = {
             "$schema": "http://json-schema.org/draft-04/schema#",
-            "title": "Path Length function parameters",
             "type": "object"
         };
         var desc = _this.extension.desc();
-        parameters["id"] = "parameters/geo/" + desc.id;
+        parameters["id"] = desc.id;
         parameters["title"] = desc.title;
         parameters["description"] = desc.description;
         parameters["properties"] = desc.properties;

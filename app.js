@@ -163,5 +163,6 @@ Darkness.Dyna = {
 Darkness.Log = Log;
 Darkness.Tenant = Tenant;
 Darkness.User = User;
+Darkness.TokenManager = require('./token_manager');
 
 module.exports = Darkness;

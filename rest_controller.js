@@ -32,7 +32,7 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
     var elasticAdapter = new ElasticAdapter(schemaManager);
 
     var hasExtensions = (callback) => {
-        var fileName = schemaManager.schema.filePath + '/extensions/' + pluralize(resource).capitalize() + 'Controller.js';
+        var fileName = process.cwd() + '/extensions/' + pluralize(resource).capitalize() + 'Controller.js';
         fs.access(fileName, fs.F_OK, (error) => {
             callback(error, fileName);
         });

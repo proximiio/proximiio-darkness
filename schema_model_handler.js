@@ -22,19 +22,25 @@ module.exports = function SchemaModelHandler(schema) {
         jschema.validate(object, this.schema, callback);
     };
 
-    this.checkParams = function(object, isUpdate) {
-        if (typeof isUpdate == "undefined") isUpdate = false;
+    this.checkParams = function(object, isUpdate, skip) {
+        if (typeof skip !== "undefined" && skip) {
+          return new Promise(function(resolve, reject) {
+            resolve(object);
+          })
+        } else {
+          if (typeof isUpdate == "undefined") isUpdate = false;
 
-        return new Promise(function(resolve, reject) {
-            var extracted = _this.extractProperties(object, isUpdate);
-            _this.validate(extracted, function(error) {
-                if (error) {
-                    reject(error);
-                } else {
-                    resolve(extracted);
-                }
-            });
-        });
+          return new Promise(function(resolve, reject) {
+              var extracted = _this.extractProperties(object, isUpdate);
+              _this.validate(extracted, function(error) {
+                  if (error) {
+                      reject(error);
+                  } else {
+                      resolve(extracted);
+                  }
+              });
+          });
+        }
     };
 
     this.extractAndValidateParams = function(object, callback) {

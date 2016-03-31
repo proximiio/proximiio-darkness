@@ -17,6 +17,7 @@ var Log = require('../logger');
 var RemoteTenantAuthorizer = function(schemaManager) {
     var TAG = 'RemoteTenantAuthorizer';
     return function(req, res, next) {
+        console.log(TAG, "req.isWhitelisted: ", req.isWhitelisted);
         if (req.isWhitelisted) {
             next();
         } else {
@@ -107,7 +108,7 @@ var RemoteTenantAuthorizer = function(schemaManager) {
                 .then(remoteVerify)
                 .then(setAccessLevel)
                 .then(function(authResponse) {
-                    req.tenant = authResponse.tenant;
+                    req.tenant = new Tenant(authResponse.tenant, schemaManager);
                     req.user = authResponse.user;
                     req.token = authResponse.tokenPayload;
                     //Log.d(TAG, `token ${req.headers.authorization} authorized`);

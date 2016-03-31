@@ -1,4 +1,41 @@
 {
+  "_args": [
+    [
+      "proximiio-darkness@git+https://53aa09407a3760d88d10be18022b6a9659a2ed71:x-oauth-basic@github.com/proximiio/proximiio-darkness.git",
+      "/opt/proximiio-core"
+    ]
+  ],
+  "_from": "git+https://53aa09407a3760d88d10be18022b6a9659a2ed71:x-oauth-basic@github.com/proximiio/proximiio-darkness.git",
+  "_id": "proximiio-darkness@0.1.4",
+  "_inCache": true,
+  "_installable": true,
+  "_location": "/proximiio-darkness",
+  "_phantomChildren": {},
+  "_requested": {
+    "hosted": {
+      "directUrl": "https://53aa09407a3760d88d10be18022b6a9659a2ed71:x-oauth-basic@raw.githubusercontent.com/proximiio/proximiio-darkness/master/package.json",
+      "gitUrl": "git://53aa09407a3760d88d10be18022b6a9659a2ed71:x-oauth-basic@github.com/proximiio/proximiio-darkness.git",
+      "httpsUrl": "git+https://53aa09407a3760d88d10be18022b6a9659a2ed71:x-oauth-basic@github.com/proximiio/proximiio-darkness.git",
+      "shortcut": "github:proximiio/proximiio-darkness",
+      "ssh": "git@github.com:proximiio/proximiio-darkness.git",
+      "sshUrl": "git+ssh://git@github.com/proximiio/proximiio-darkness.git",
+      "type": "github"
+    },
+    "name": "proximiio-darkness",
+    "raw": "proximiio-darkness@git+https://53aa09407a3760d88d10be18022b6a9659a2ed71:x-oauth-basic@github.com/proximiio/proximiio-darkness.git",
+    "rawSpec": "git+https://53aa09407a3760d88d10be18022b6a9659a2ed71:x-oauth-basic@github.com/proximiio/proximiio-darkness.git",
+    "scope": null,
+    "spec": "git+https://53aa09407a3760d88d10be18022b6a9659a2ed71:x-oauth-basic@github.com/proximiio/proximiio-darkness.git",
+    "type": "hosted"
+  },
+  "_requiredBy": [
+    "/"
+  ],
+  "_resolved": "git+https://53aa09407a3760d88d10be18022b6a9659a2ed71:x-oauth-basic@github.com/proximiio/proximiio-darkness.git#0db168f9a4186d05631cd4a7d7bafc0b025253f3",
+  "_shasum": "c0f20a20737cd8d329f88472e9c5090ada22dbf5",
+  "_shrinkwrap": null,
+  "_spec": "proximiio-darkness@git+https://53aa09407a3760d88d10be18022b6a9659a2ed71:x-oauth-basic@github.com/proximiio/proximiio-darkness.git",
+  "_where": "/opt/proximiio-core",
   "author": {
     "email": "matej.drzik@quanto.com",
     "name": "Matej Drzik"

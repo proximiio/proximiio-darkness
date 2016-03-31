@@ -44,18 +44,15 @@ Darkness.start = function(schemaFilePath, callback) {
     let setMiddleware = (app) => {
 	app.use(function(req, res, next) {
 	  req.headers['content-type'] = req.headers['content-type'] || 'application/json';
-//          if (req.path != '/core_auth/login' || req.path != '/core_auth/registration') { 
-  //          req.headers['content-type'] = 'application/json';
-    //      }
-          console.log('req headers content-type set to:', req.headers['content-type']);
 	  next();
 	});
-        var bodyParser = require('body-parser');
-        app.use(express.static(__dirname + '/public'));
-        app.use(bodyParser.urlencoded({ extended: true }));
-        app.use(bodyParser.json());
-        app.use(require('./request_logger'));
-        //app.use(require('./middleware/contentTypeManager.js'));
+
+    var bodyParser = require('body-parser');
+    app.use(express.static(__dirname + '/public'));
+    app.use(bodyParser.urlencoded({ extended: true }));
+    app.use(bodyParser.json());
+    app.use(require('./middleware/request_logger'));
+    //app.use(require('./middleware/contentTypeManager.js'));
 	app.use(function (req, res, next) {
 	  res.header("Content-Type",'application/json');
 	  next();
@@ -107,9 +104,8 @@ Darkness.start = function(schemaFilePath, callback) {
     let dynaDiscoverAndExpose = (app) => {
         return DynaAutoDiscovery(schemaManager)
             .then(function(dynaRouters) {
-                "use strict";
                 dynaRouters.forEach((dynaRouter) => {
-		  app.use('/' + dynaRouter.endPoint, dynaRouter.router);
+                    app.use('/' + dynaRouter.endPoint, dynaRouter.router);
                 });
                 return app;
             });
@@ -128,8 +124,11 @@ Darkness.start = function(schemaFilePath, callback) {
 
         var currentUser = function(req, res) {
             User.findByToken(req.consumer.token, schemaManager).then(function(user) {
-                var response = user;
-                response[schemaManager.getTenantIdField()] = req[schemaManager.schema.multitenancy.entity];
+                var response = user.public();
+                response[schemaManager.getTenantIdField()] = req.tenant.id;
+                response.organization = req.tenant.public();
+                response.tokens = req.tenant.decodeTokens();
+                response.data = user.data;
                 res.send(JSON.stringify(response));
             }).catch(function(error) {
                 res.send(JSON.stringify({error: error}));
@@ -140,7 +139,7 @@ Darkness.start = function(schemaFilePath, callback) {
 
         var route, routes = [];
 
-        app._router.stack.forEach(function(middleware){
+        app._router.stack.forEach(function(middleware) {
             if(middleware.route){ // routes registered directly on the app
                 routes.push(middleware.route);
             } else if(middleware.name === 'router'){ // router middleware

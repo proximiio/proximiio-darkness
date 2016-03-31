@@ -24,6 +24,15 @@ var User = function(data, schemaManager) {
         return this.data.name;
     };
 
+    this.changePassword = function(newPassword) {
+        var encrypted = TokenManager.encode(newPassword, schemaManager.schema.secret); 
+        storage.get(_this.getId())
+               .update({password: encrypted})
+               .then((results) => {
+                 _this.data.password = encrypted;
+                 return _this; 
+               });
+    };
     /**
      * Upserts current user data to datastore
      *

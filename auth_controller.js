@@ -15,11 +15,44 @@ module.exports = function RestController(schemaManager) {
      *
      * @param {Object} res - Response
      */
-    var respondWithError = function(res) {
+    let respondWithError = function(res) {
         return function(error) {
             res.status(error.code).send(error.json);
         }
     };
+
+    let changePassword = (req, res) => {
+      let password = req.body.password;
+      let encodedPassword = TokenManager.encode(password, schemaManager.schema.secret);
+      
+      let changePassword = (user) => {
+         return user.changePassword(password)
+                    .then((user) => {
+		      return user.public(); 
+                    });
+      }
+        
+      User.get(req.token.user_id, schemaManager)
+          .then(changePassword)
+          .then(function(response) {
+                res.send(JSON.stringify(response));
+          })
+          .catch(respondWithError(res));
+    }
+ 
+    let forgotPassword = (req, res) => {
+      res.send({message: 'should send forgot password mail'});
+    };
+
+    let checkCompany = (req, res) => {
+      var name = req.body.name;
+      console.log('searching organizations for name:', name);
+      schemaManager.storage.table('organizations').filter({company: name}).then((results) => {
+        res.send({
+          available: (Array.isArray(results) && results.length == 0)
+        })
+      });
+    }    
 
     /**
      * Login Api Endpoint
@@ -27,7 +60,7 @@ module.exports = function RestController(schemaManager) {
      * @param req
      * @param res
      */
-    var login = function(req, res) {
+    let login = function(req, res) {
         var email = req.body.email;
         var password = req.body.password;
         var encodedPassword = TokenManager.encode(password, schemaManager.schema.secret);
@@ -57,7 +90,7 @@ module.exports = function RestController(schemaManager) {
      * @param req
      * @param res
      */
-    var logout = function(req, res) {
+    let logout = function(req, res) {
         res.send(JSON.stringify({success: true}));
     };
 
@@ -67,15 +100,15 @@ module.exports = function RestController(schemaManager) {
      * @param req
      * @param res
      */
-    var currentUser = function(req, res) {
+    let currentUser = function(req, res) {
         User.findByToken(req.consumer.token, schemaManager).then(function(user) {
             res.send(JSON.stringify(user.public()));
         }).catch(respondWithError(res));
     };
 
-    var authorize = function(req, res) {
-        var authRequest = req.body;
-        var authorizeToken = function(tenant) {
+    let authorize = function(req, res) {
+        let authRequest = req.body;
+        let authorizeToken = function(tenant) {
             return tenant.authorizeToken(authRequest.token).then(function(payload) {
                 return {
                     tenant: tenant.public(),
@@ -84,7 +117,7 @@ module.exports = function RestController(schemaManager) {
             });
         };
 
-        var assignTokenTypeEntity = function(authResponse) {
+        let assignTokenTypeEntity = function(authResponse) {
             if (authResponse.tokenPayload.type == 'user') {
                 return User.get(authResponse.tokenPayload.user_id, schemaManager).then(function(user) {
                     authResponse.user = user.public();
@@ -95,7 +128,7 @@ module.exports = function RestController(schemaManager) {
             }
         };
 
-        var respond = function(authResponse) {
+        let respond = function(authResponse) {
             res.send(authResponse);
         };
 
@@ -105,13 +138,16 @@ module.exports = function RestController(schemaManager) {
               .then(respond);
     };
 
-    var registrationController = new RegistrationController(schemaManager);
+    let registrationController = new RegistrationController(schemaManager);
 
     router.post('/login', login);
     router.post('/logout', logout);
     router.post('/authorize', authorize);
     router.get('/', currentUser);
+    router.post('/check_company', checkCompany);
     router.use('/registration', registrationController.router);
+    router.use('/change_password', changePassword);
+    router.use('/forgot_password', forgotPassword);
 
     this.router = router;
 

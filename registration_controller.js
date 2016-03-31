@@ -134,7 +134,21 @@ var RegistrationController = function(schemaManager) {
     };
 
     let addApplication = function(tenant) {
-        var application = {name: 'Default Application'};
+        var application = {
+          name: 'Default Application', 
+          type: 'mobile',
+          organization_id: tenant.getId(),
+          settings: {
+            eddystone: true,
+            gpsgeofences: true,
+            ibeacons: true,
+            indooratlas: false,
+            indooratlasapikey: "",
+            indooratlasapikeysecret: "",
+            steerpath: false,
+            steerpathndd: ""
+          }
+        };
         return requestPromise({
           uri: 'https://api.proximi.fi/core/applications',
           method: 'POST',
@@ -149,6 +163,55 @@ var RegistrationController = function(schemaManager) {
           console.log('returning tenant', tenant);
           return tenant;
         });
+    };
+
+    var sendWelcomeEmail = function(params) {
+        return function(tenant) {
+            return requestPromise({
+                uri: 'https://api.proximi.fi/mailer/registration',
+                method: 'POST',
+                headers: {
+                    'Authorization': '129bea7fc6f6437ac38fd37c53f13982',
+                    'x-authorization-request-issuer': schemaManager.schema.name + ' (' + schemaManager.schema.version + ')'
+                },
+                json: true,
+                body: {
+                    header: {
+                        from: 'support@proximi.io',
+                        to: params.email,
+                        bcc: 'support@proximi.io, matej.drzik@quanto.sk',
+                        subject: "Welcome onboard"
+                    },
+                    data: params
+                }
+            }).then((response) => {
+                return tenant;
+            });
+        }
+    };
+
+    var sendRegistrationAlertEmail = function(params) {
+        return function(tenant) {
+            return requestPromise({
+                uri: 'https://api.proximi.fi/mailer/registration_alert',
+                method: 'POST',
+                headers: {
+                    'Authorization': '129bea7fc6f6437ac38fd37c53f13982',
+                    'x-authorization-request-issuer': schemaManager.schema.name + ' (' + schemaManager.schema.version + ')'
+                },
+                json: true,
+                body: {
+                    header: {
+                        to: 'support@proximi.io',
+                        bcc: 'matej.drzik@quanto.sk',
+                        subject: "[Proximi.io] New Registration"
+                    },
+                    data: params
+                }
+            }).then((response) => {
+                return tenant;
+            });
+        }
     };
 
     /**
@@ -167,6 +230,8 @@ var RegistrationController = function(schemaManager) {
                 .then(addKongConsumerCredentials)
                 .then(addUserAccount(params.name, params.email, params.password))
                 .then(addApplication)
+                .then(sendWelcomeEmail(params))
+                .then(sendRegistrationAlertEmail(params))
                 .then(loginUser(req, params))
                 .then(function(response) {
                     res.send(response);

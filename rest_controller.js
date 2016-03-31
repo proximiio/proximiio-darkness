@@ -58,6 +58,7 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
     };
 
     this.index = (req, res) => {
+        console.log('index called for resource: ', resource);
         var limit = parseInt(req.query.limit) || DEFAULT_LIMIT;
         var skip = parseInt(req.query.skip) || 0;
         var order = req.query.order || 'id';
@@ -103,6 +104,17 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
                 throw new OwnershipError();
             }
         }
+    };
+
+    let getRedEntity = (params) => {
+      return Model.filter({data: {redId: params.id}}).then((result) => {
+          if (result == null || result.length == 0) {
+             throw new NotFoundError();
+          } else {
+             console.log('getRedEntity returning ', result[0]);
+             return result;
+          }
+      });
     };
 
     let getEntity = (params) => {
@@ -216,33 +228,34 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
  
     this.create = (req, res) => {
         var params = req.body;
-        if (typeof params['id'] != "undefined") {
-            delete params['id'];
-        }
-
         params[schemaManager.getTenantIdField()] = req.tenant.id;
         params.createdAt = new Date().toISOString();
         params.updatedAt = params.createdAt;
-
+        console.log('create params:', params);
         if (typeof _this.extensions != 'undefined' &&
             _this.extensions.hasOwnProperty('overrides') &&
             _this.extensions.overrides.hasOwnProperty('create')) {
+            console.log('calling create override for resource: ', resource);
             _this.extensions.overrides.create(req, res);
         } else {
-            schemaModelHandler.checkParams(req.body)
+            if (typeof params['id'] != "undefined") {
+                delete params['id'];
+            }
+            schemaModelHandler.checkParams(req.body, true, true)
                 .then(validateOwnership(req))
                 .then(createEntity)
                 .then(getEntity)
                 .then(callExtensions(req, res, "create:after"))
                 .then(updateElasticRecord(req))
-                .then(emitConfigChange(req, 'create'))
                 .then(respond(req, res))
+                .then(emitConfigChange(req, 'create'))
                 .catch(respondWithError(res))
                 .error(respondWithError(res));
         }
     };
 
     this.update = (req, res) => {
+        console.log('update for entity: ', resource, ' with params: ', req.body); 
         var params = req.body;
 
         if (schemaManager.multitenancy) {
@@ -254,7 +267,7 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
         }
 
         params.updatedAt = (new Date()).toISOString();
-
+        
         getEntity(req.body)
             .then((entity) => {
                 Object.assign(entity, params);
@@ -265,35 +278,75 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
             .then(getEntity)
             .then(callExtensions(req, res, "update:after"))
             .then(updateElasticRecord(req))
-            .then(emitConfigChange(req, 'update'))
             .then(respond(req, res))
+            .then(emitConfigChange(req, 'update'))
             .catch(respondWithError(res))
             .error(respondWithError(res));
+    };
+  
+    this.removePreviousRedBundle = (req, params) => {
+      console.log('should remove previous bundle, current:', params.bundle_id);
+      return Model.filter({organization_id: req.tenant.id})
+                  .filter((record) => {
+                    if (typeof newBundleId == "undefined") {
+                      return false;
+                    } else {
+                      return record('bundle_id').eq(params.bundle_id).not();
+                    }
+                  })
+                  .delete()
+                  .then(() => { return params; })
+    };
+ 
+    this.redUpdate = (req, res) => {
+      var params = req.body;
+      console.log('redUpdate called for: ', params);
+      var redId = params.data.id;
+
+      if (schemaManager.multitenancy) {
+            params[schemaManager.getTenantIdField()] = req.tenant.id;
+      }
+
+      let create = (params) => {
+        console.log('should create: ', params);
+        return Model.insert(params, {conflict: 'replace'});
+      }
+
+      this.removePreviousRedBundle(req, params)
+           .then(create)
+           .then(getRedEntity)
+           .then(respond(req, res))
+           .catch(respondWithError(res))
+           .error(respondWithError(res));
     };
 
     this.destroy = (req, res) => {
         getEntity(req.params)
             .then(validateOwnership(req))
             .then(destroyEntity)
-            .then(emitConfigChange(req, 'delete'))
             .then(callExtensions(req, res, "delete:after"))
             .then(respond(req, res))
+            .then(emitConfigChange(req, 'delete'))
             .then(deleteElasticRecord(req))
             .catch(respondWithError(res))
             .error(respondWithError(res));
     };
 
     this.upsert = (req, res) => {
-        if (req.body.id != null &&
-            req.body.id != "null" &&
-            req.body.id != "new" &&
-            typeof req.body.id != 'undefined') {
-            console.log('upsert calling update');
-            _this.update(req, res);
+        if (req.query.red) {
+          _this.redUpdate(req, res);
         } else {
-            console.log('upsert calling insert');
-            _this.create(req ,res);
-        }
+          if (req.body.id != null &&
+              req.body.id != "null" &&
+              req.body.id != "new" &&
+              typeof req.body.id != 'undefined') {
+              console.log('upsert calling update');
+              _this.update(req, res);
+          } else {
+              console.log('upsert calling insert');
+              _this.create(req ,res);
+          }
+       }
     };
 
     router.get('/' + this.plural, this.index);

@@ -8,7 +8,6 @@ var yaml = require('write-yaml');
 var Log = require('./logger');
 var SchemaManager = require('./schema_manager');
 var SchemaExport = require('./schema_export');
-var AuthController = require('./auth_controller');
 var DynaAutoDiscovery = require('./dyna/autodiscovery');
 var listRoutes = require('./helpers/listRoutes');
 var User = require('./user');
@@ -73,13 +72,6 @@ Darkness.start = function(schemaFilePath, callback) {
         return app;
     };
 
-    let initAuthController = (app) => {
-        let authController = new AuthController(schemaManager);
-        app.use(schemaManager.schema.authRoot, authController.router);
-        Log.system('AuthController', 'exposed to '.white + authController.authRoot.yellow.bold + ' endpoint'.white);
-        return app;
-    };
-
     let exposeSchemas = (app) => {
         var schemaExport = new SchemaExport(schemaManager);
         app.use(schemaManager.schema.export.root, schemaExport.router);
@@ -119,8 +111,6 @@ Darkness.start = function(schemaFilePath, callback) {
 
     let finalize = (app) => {
         Log.system('DarknessFramework', 'application', appSchema.name.cyan.bold, 'started');
-        var __measureExecTime2 = process.hrtime(__measureExecTime);
-        var __executionTime = `${__measureExecTitle} ${__measureExecTime2[0]}.${Math.round(__measureExecTime2[1]/(1000*1000))}s`;
 
         var currentUser = function(req, res) {
             User.findByToken(req.consumer.token, schemaManager).then(function(user) {
@@ -136,20 +126,8 @@ Darkness.start = function(schemaFilePath, callback) {
         };
 
         app.get('/core/current_user', currentUser);
-
-        var route, routes = [];
-
-        app._router.stack.forEach(function(middleware) {
-            if(middleware.route){ // routes registered directly on the app
-                routes.push(middleware.route);
-            } else if(middleware.name === 'router'){ // router middleware
-                middleware.handle.stack.forEach(function(handler) {
-                    route = handler.route;
-                    route && routes.push(route);
-                });
-            }
-        });
-
+        var __measureExecTime2 = process.hrtime(__measureExecTime);
+        var __executionTime = `${__measureExecTitle} ${__measureExecTime2[0]}.${Math.round(__measureExecTime2[1]/(1000*1000))}s`;
         Log.d('DarknessFramework', __executionTime);
         callback(app);
     };
@@ -160,7 +138,6 @@ Darkness.start = function(schemaFilePath, callback) {
             return app;
         })
         .then(setMiddleware)
-        .then(initAuthController)
         .then(exposeSchemas)
         .then(initRestControllers)
         .then(dynaDiscoverAndExpose)
@@ -181,5 +158,7 @@ Darkness.Dyna = {
     Controller: require('./dyna/controller'),
     Method: require('./dyna/method')
 };
+
+Darkness.Log = Log;
 
 module.exports = Darkness;

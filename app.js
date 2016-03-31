@@ -29,11 +29,11 @@ var Darkness = function() {};
  * @param callback - called after application launch is complete, customizations come here
  */
 Darkness.start = function(schemaFilePath, callback) {
-    var __measureExecTitle= "Darkness Execution Time", __measureExecTime = process.hrtime();
+    var __measureExecTime = process.hrtime();
 
     appSchema = JSON.parse(fs.readFileSync(schemaFilePath, 'utf8'));
     var schemaManager = new SchemaManager(appSchema, process.argv[2]);
-
+    var __measureExecTitle= "Darkness Execution Time (" + schemaManager.schema.name.cyan.bold + ")";
     Log.system('DarknessFramework', 'starting application', appSchema.name.cyan.bold + (' ('+appSchema.version+')').white.bold);
 
     var port = process.env.PORT || schemaManager.settings().servers.http.port;

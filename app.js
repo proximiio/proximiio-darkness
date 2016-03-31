@@ -89,8 +89,10 @@ Darkness.start = function(schemaFilePath, callback) {
     };
 
     let exposeSwagger = (app) => {
-        app.get(appSchema.explorerRoot + '/swagger/def', schemaManager.swaggerDefResponse);
-        Log.system('SwaggerUI', 'exposed to ' + (appSchema.explorerRoot + '/swagger/def').yellow.bold);
+        if (appSchema.hasOwnProperty('explorerRoot')) {
+            app.get(appSchema.explorerRoot + '/swagger/def', schemaManager.swaggerDefResponse);
+            Log.system('SwaggerUI', 'exposed to ' + (appSchema.explorerRoot + '/swagger/def').yellow.bold);
+        }
         return app;
     };
 

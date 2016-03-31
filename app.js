@@ -165,4 +165,16 @@ Darkness.Tenant = Tenant;
 Darkness.User = User;
 Darkness.TokenManager = require('./token_manager');
 
+Darkness.Validators = {
+    email: require('./helpers/emailValidator')
+};
+
+Darkness.Errors = {
+    NotAllowedError: require('./errors/notAllowedError'),
+    InvalidEmailFormatError: require('./errors/invalidEmailFormatError'),
+    EmailUniquenessError: require('./errors/emailUniquenessError'),
+    StatusCodeError: require('./errors/statusCodeError'),
+    DarkError: require('./errors/darkError')
+};
+
 module.exports = Darkness;

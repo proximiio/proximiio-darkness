@@ -112,25 +112,11 @@ Darkness.start = function(schemaFilePath, callback) {
 
     let finalize = (app) => {
         Log.system('DarknessFramework', 'application', appSchema.name.cyan.bold, 'started');
-
-        var currentUser = function(req, res) {
-            User.findByToken(req.consumer.token, schemaManager).then(function(user) {
-                var response = user.public();
-                response[schemaManager.getTenantIdField()] = req.tenant.id;
-                response.organization = req.tenant.public();
-                response.tokens = req.tenant.decodeTokens();
-                response.data = user.data;
-                res.send(JSON.stringify(response));
-            }).catch(function(error) {
-                res.send(JSON.stringify({error: error}));
-            });
-        };
-
-        app.get('/core/current_user', currentUser);
         var __measureExecTime2 = process.hrtime(__measureExecTime);
         var __executionTime = `${__measureExecTitle} ${__measureExecTime2[0]}.${Math.round(__measureExecTime2[1]/(1000*1000))}s`;
-        Log.d('DarknessFramework', __executionTime);
-        callback(app);
+        callback(app, function() {
+            Log.d('DarknessFramework', __executionTime);
+        });
     };
 
     schemaManager.storageManager.ensureReady()
@@ -147,7 +133,7 @@ Darkness.start = function(schemaFilePath, callback) {
         .then(finalize)
         .catch((error) => {
             "use strict";
-            Log.error("DarknessError", error);
+            console.log("DarknessError", error);
         });
 };
 

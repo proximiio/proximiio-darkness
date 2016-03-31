@@ -11,6 +11,7 @@ var SchemaExport = require('./schema_export');
 var DynaAutoDiscovery = require('./dyna/autodiscovery');
 var listRoutes = require('./helpers/listRoutes');
 var User = require('./user');
+var Tenant = require('./tenant');
 
 /**
  * Darkness Object
@@ -160,5 +161,7 @@ Darkness.Dyna = {
 };
 
 Darkness.Log = Log;
+Darkness.Tenant = Tenant;
+Darkness.User = User;
 
 module.exports = Darkness;

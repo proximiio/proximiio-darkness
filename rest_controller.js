@@ -106,17 +106,6 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
         }
     };
 
-    let getRedEntity = (params) => {
-      return Model.filter({data: {redId: params.id}}).then((result) => {
-          if (result == null || result.length == 0) {
-             throw new NotFoundError();
-          } else {
-             console.log('getRedEntity returning ', result[0]);
-             return result;
-          }
-      });
-    };
-
     let getEntity = (params) => {
         console.log('getEntity', params);
         return Model.get(params.id).then(function(result) {
@@ -208,7 +197,7 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
           },
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
-        }
+        };
         event[schemaManager.getTenantIdField()] = req.consumer.id;
 
         return requestPromise({
@@ -284,42 +273,6 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
             .error(respondWithError(res));
     };
   
-    this.removePreviousRedBundle = (req, params) => {
-      console.log('should remove previous bundle, current:', params.bundle_id);
-      return Model.filter({organization_id: req.tenant.id})
-                  .filter((record) => {
-                    if (typeof newBundleId == "undefined") {
-                      return false;
-                    } else {
-                      return record('bundle_id').eq(params.bundle_id).not();
-                    }
-                  })
-                  .delete()
-                  .then(() => { return params; })
-    };
- 
-    this.redUpdate = (req, res) => {
-      var params = req.body;
-      console.log('redUpdate called for: ', params);
-      var redId = params.data.id;
-
-      if (schemaManager.multitenancy) {
-            params[schemaManager.getTenantIdField()] = req.tenant.id;
-      }
-
-      let create = (params) => {
-        console.log('should create: ', params);
-        return Model.insert(params, {conflict: 'replace'});
-      }
-
-      this.removePreviousRedBundle(req, params)
-           .then(create)
-           .then(getRedEntity)
-           .then(respond(req, res))
-           .catch(respondWithError(res))
-           .error(respondWithError(res));
-    };
-
     this.destroy = (req, res) => {
         getEntity(req.params)
             .then(validateOwnership(req))
@@ -333,20 +286,14 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
     };
 
     this.upsert = (req, res) => {
-        if (req.query.red) {
-          _this.redUpdate(req, res);
+        if (req.body.id != null &&  req.body.id != "null" &&  req.body.id != "new" &&  typeof req.body.id != 'undefined') {
+            console.log('upsert calling update');
+            _this.update(req, res);
         } else {
-          if (req.body.id != null &&
-              req.body.id != "null" &&
-              req.body.id != "new" &&
-              typeof req.body.id != 'undefined') {
-              console.log('upsert calling update');
-              _this.update(req, res);
-          } else {
-              console.log('upsert calling insert');
-              _this.create(req ,res);
-          }
-       }
+            console.log('upsert calling insert');
+            _this.create(req ,res);
+        }
+
     };
 
     router.get('/' + this.plural, this.index);

@@ -1,3 +1,4 @@
+"use strict";
 var _ = require('underscore');
 var pluralize = require('plur');
 var SchemaToSwagger = require('./schema_to_swagger');
@@ -53,10 +54,16 @@ module.exports = function SchemaManager(schema, environment) {
 
     this.redisClient = redis.createClient(this.schema.settings[this.environment].redis.url, this.schema.settings[this.environment].redis.options);
 
+    this.isRestResource = function(resource) {
+        return !_this.schema.resources[resource].hasOwnProperty('controller') ||
+            (_this.schema.resources[resource].hasOwnProperty('controller') &&
+             _this.schema.resources[resource].controller.toLowerCase() == 'rest');
+    };
+
     this.restControllers = function() {
         var controllers = [];
         _.each(Object.keys(this.schema.resources), function(resource) {
-            if (_this.isResourcePublishable(resource)) {
+            if (_this.isResourcePublishable(resource) && _this.isRestResource(resource)) {
                 var controller = new RestController(resource, _this.modelHandler(resource), _this.storage, _this);
                 controllers.push(controller);
             }

@@ -65,9 +65,29 @@ TenantAuthorizer alternative that uses remote Darkness Service as TenantAuthoriz
 
 ## Usage
 
-require proximiio-darkness with reference to app.json and start app
+Service is defined in app.json (DarknessSchema), for adding custom logic, see following example:
 
+```code
 var darkness = require('proximiio-darkness');
 darkness.start(__dirname + '/app.json', function(app) {
-  // do custom app logic here
+
+  // do your custom app logic here  
+  const getEnterEvents = () => {
+    return app.schemaManager.storage
+      .table('events')
+      .getAll(req.tenant.id, {index: 'organization_id'})
+      .filter({event: 'enter'});
+  }
+    
+  // custom endpoint example, request is passing through all the darkness middleware
+  // available at this point: req.token (Tenant Token object), req.tenant (Tenant object)
+  app.get('/core/something', (req, res) => {
+    getEnterEvents()
+      .then((events) => {        
+        res.send(events);       
+      });
+  });
+  
 });
+```
+

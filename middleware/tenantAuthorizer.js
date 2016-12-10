@@ -23,9 +23,10 @@ var TenantAuthorizer = function(schemaManager) {
              *
              * @param {Object} res - Response
              */
-            var respondWithError = function(res) {
+            var respondWithError = function(rez) {
                 return function(error) {
-                    res.status(error.code).send(error.json);
+                    console.log('should respond with error', error.code, error.json);
+                    rez.status(error.code).send(error.json);
                 };
             };
 
@@ -84,15 +85,18 @@ var TenantAuthorizer = function(schemaManager) {
                 return new Promise(function(resolve, reject) {
                     var hasWriteAccess = tokenPayload.type == 'user';
                     var needsWriteAccess = req.method != 'GET';
-                    if (needsWriteAccess) {
+//                    var writable = ['/core/events', '/core/visitors'];
+                    resolve(tokenPayload);
+/*                    if (needsWriteAccess) {
                         if (hasWriteAccess) {
-                            resolve(state.tenant, tokenPayload);
+                            resolve(tokenPayload);
                         } else {
                             reject(new PermissionDeniedError());
                         }
                     } else {
-                        resolve(state.tenant, tokenPayload)
+                        resolve(tokenPayload)
                     }
+*/
                 });
             };
 
@@ -115,8 +119,8 @@ var TenantAuthorizer = function(schemaManager) {
                 .then(loadTenant)
                 .then(authorizeToken)
                 .then(setAccessLevel)
-                .then(function(tenant, tokenPayload) {
-                    req.tenant = tenant;
+                .then(function(tokenPayload) {
+                    req.tenant = state.tenant;
                     req.token = tokenPayload;
                     next();
                 })

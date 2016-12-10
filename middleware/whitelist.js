@@ -15,13 +15,13 @@ var UrlWhitelist = function(whitelist) {
             if (typeof url == 'string') {
                 if (url == req.path) {
                     req.isWhitelisted = true;
-                    Log.d(TAG, "Whitelisting request");
+                    //Log.d(TAG, "Whitelisting request");
                 }
             } else if (typeof url == 'object') {
                 if (url.type == 'parent') {
                     if (req.path.indexOf(url.parent) == 0) {
                         req.isWhitelisted = true;
-                        Log.d(TAG, "Whitelisting request");
+                        //Log.d(TAG, "Whitelisting request");
                     }
                 }
             }

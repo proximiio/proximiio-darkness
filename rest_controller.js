@@ -15,8 +15,9 @@ var Promise = require('bluebird');
 var OwnershipError = require('./errors/ownershipError');
 var NotFoundError = require('./errors/notFoundError');
 var requestPromise = require('request-promise');
+var _ = require('underscore');
 
-var DEFAULT_LIMIT = 1000;
+var DEFAULT_LIMIT = 500;
 
 module.exports = function RestController(resource, schemaModelHandler, datastore, schemaManager) {
     var _this = this;
@@ -32,7 +33,7 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
     var elasticAdapter = new ElasticAdapter(schemaManager);
 
     var hasExtensions = (callback) => {
-        var fileName = process.cwd() + '/extensions/' + pluralize(resource).capitalize() + 'Controller.js';
+        var fileName = schemaManager.schema.filePath + '/extensions/' + pluralize(resource).capitalize() + 'Controller.js';
         fs.access(fileName, fs.F_OK, (error) => {
             callback(error, fileName);
         });
@@ -58,38 +59,181 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
     };
 
     this.index = (req, res) => {
-        console.log('index called for resource: ', resource);
+        //console.log('index called for resource: ', resource, req.path, 'params', req.params, 'query', req.query);
+        if (resource.substring(0,3) == 'red') {
+          //console.log('is red resource');
+          schemaManager.storage.table(_this.plural)
+                               .getAll(req.tenant.id, {index: 'organization_id'})
+                               .then((flows) => {
+                                 res.send(formatOutput(flows));
+                               });
+        } else {
         var limit = parseInt(req.query.limit) || DEFAULT_LIMIT;
         var skip = parseInt(req.query.skip) || 0;
-        var order = req.query.order || 'id';
-        var filter = {};
+        var orderField = req.query.order || 'createdAt';
+        var orderDirection = req.query.dir || 'desc'; 
 
-        if (schemaManager.multitenancy) {
-            filter[schemaManager.schema.multitenancy.entity + '_id'] = req.consumer.id;
+        var radius = req.query.search_radius || '100';
+        var geoSearchAllowed = typeof schemaManager.schema.resources[resource].schema.geoSearch != 'undefined' && 
+			       typeof req.query.search_latitude != 'undefined' &&
+                               typeof req.query.search_longitude != 'undefined'; 
+        var geoSearchField = schemaManager.schema.resources[resource].schema.geoSearch;
+
+/*
+        var organizationFilter = {
+          "filtered": {
+            "filter": {
+              "match": {
+                "organization_id": req.tenant.id
+              }
+            }
+          }
+        };
+*/
+        var organizationFilter = {
+          "bool": {
+             "must": {
+               "match": { "organization_id": req.tenant.id }
+             }
+          }
         }
 
-        Model.orderBy({index: order})
-             .filter(filter)
-             .skip(skip)
-             .limit(limit)
-             .run().then((result) => {
-                res.send(formatOutput(result));
-             })             .error(dbErrorHandler(res));
+        var filters = [ organizationFilter ]; 
+        var notFilters = [];
+       
+        var query = {
+          "bool": {
+            "must": filters,
+            "must_not": notFilters
+          }
+        };
+        //console.log('filters stage 1', JSON.stringify(filters));
+        if (typeof req.query.q != "undefined" && req.query.q.length > 2) {
+          filters.push({"bool": { "must": { "wildcard": { "name": "*" + req.query.q.toLowerCase() + "*" } } } });
+        } 
+
+        if (typeof req.query.filter != "undefined" && req.query.filter.length > 0) {
+          var kv = req.query.filter.split(':');
+          var q = {bool: { must: {match: {}}}};
+          q.bool.must.match[kv[0]] = kv[1];
+          filters.push(q);
+        }
+
+        var sort = {};
+        sort[orderField] = {"order": orderDirection.toLowerCase()}; 
+
+        if (resource == 'event') {
+          if (typeof req.query.type != 'undefined') {
+            var split = req.query.type.split(',');
+            if (split.length > 1) {
+              notFilters.push({"match": { "event" : 'config-change' }});
+            } else {
+              filters.push({"match": { "event" : req.query.type }});
+            }
+          }
+        }
+        //console.log('filters starge 2', JSON.stringify(filters));
+        if (geoSearchAllowed) {
+          var geoQuery = {
+            "bool": {
+               "must": {
+                  "match": {
+                    "organization_id": req.tenant.id
+                  }
+               },
+               "filter": {
+                  "geo_distance": {
+                    "distance": req.query.search_radius + "m",
+                    "geopoint": [parseFloat(req.query.search_longitude), parseFloat(req.query.search_latitude)]
+                  }
+               }
+            }
+          };
+/*
+          var geoQuery = { 
+            "filtered": {
+              "filter": {
+                "geo_distance": {
+                  "distance": req.query.search_radius + "m",
+                  "geopoint": [parseFloat(req.query.search_longitude), parseFloat(req.query.search_latitude)]
+                }
+              }
+            }
+          }
+*/
+          filters.push(geoQuery);
+          sort = [{
+            "_geo_distance": {
+              "geopoint": [parseFloat(req.query.search_longitude), parseFloat(req.query.search_latitude)],
+              "order": "asc",
+              "unit": "m", 
+              "distance_type": "plane"
+            }
+          }]
+        };
+
+        var bundle = {
+          "query": query,
+          "from": skip,
+          "size": limit,
+          "sort": sort
+        };
+
+        //console.log('index bundle:', JSON.stringify(bundle, null, 4));
+
+        schemaManager.elasticAdapter.count(resource, req.tenant.id)
+          .then((count) => { 
+             res.set('RecordCount', count);
+             schemaManager.elasticAdapter.search(resource, bundle)
+               .then((response) => {
+                 res.set('SearchCount', response.total);
+                 res.send(formatOutput(response.results));
+               });
+          }).catch((error) => { 
+            console.log('search_error', error);
+          });
+        }
     };
 
     this.count = (req, res) => {
-        Model.filter({organization_id: req.tenant.id}).count().run().then((result) => {
-            if (result == null) {
-                res.status(404).send("Resource for count Not Found");
-            } else {
-                res.send(formatOutput({count: result}));
-            }
-        }).error(dbErrorHandler(res));
+       schemaManager.elasticAdapter.count(resource, req.tenant.id)
+        .then((count) => {
+          res.send(formatOutput({count: count}));
+       });
+    };
+
+    var visitorsInGeofence = (geofenceId) => {
+       return (data) => {
+         return schemaManager.storage.table('events')
+                            .filter({organization_id: req.tenant.id, event: 'enter', geofence_id: geofenceId})
+                            .filter(function(doc) {
+                              return doc.hasFields('dwellTime').not();
+                            })
+                           .count()
+                           .then((resultCount) => {
+                              return {presentVisitors: resultCount};
+                           });
+       };
     };
 
     this.show = (req, res) => {
+        var geofenceId = req.query.id;
         getEntity(req.params)
             .then(validateOwnership(req))
+            .then((data) => {
+               if (resource == 'geofence') {
+		        return schemaManager.storage.table('events')
+                            .filter({organization_id: req.tenant.id, event: 'enter', geofence_id: req.params.geofence_id})
+                            .filter(function(doc) {
+                              return doc.hasFields('dwellTime').not();
+                            })
+                           .count()
+                           .then((visitorsCount) => {
+                              data.visitorsCount = visitorsCount;
+                              return data;
+                           });
+               } else { return data; };
+            })
             .then(respond(req, res))
             .catch(respondWithError(res))
             .error(respondWithError(res));
@@ -97,7 +241,7 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
 
     let validateOwnership = (req) => {
         return function(params) {
-            console.log('received params: ', params);
+            //console.log('received params: ', params);
             if (req.tenant.validatesOwnership(params)) {
                 return params;
             } else {
@@ -106,28 +250,98 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
         }
     };
 
+    let getRedEntity = (params) => {
+      return Model.filter({data: {redId: params.id}}).then((result) => {
+          if (result == null || result.length == 0) {
+             throw new NotFoundError();
+          } else {
+             //console.log('getRedEntity returning ', result[0]);
+             return result;
+          }
+      });
+    };
+
     let getEntity = (params) => {
-        console.log('getEntity', params);
+        //console.log('getEntity', params);
         return Model.get(params.id).then(function(result) {
           if (result == null) {
              throw new NotFoundError();
           } else {
-             console.log('getEntity returning ', result);
+             //console.log('getEntity returning ', result);
              return result;
           }
         });
     };
 
+    let fetchFloor = (params) => {
+      if (params.hasOwnProperty('floor_id') && params.floor_id != null && !params.hasOwnProperty('floor_name')) {
+        return schemaManager.storage.table('floors').get(params.floor_id)
+          .then((result) => {
+            console.log('assign floor result', result);
+            if (result != null) {
+              params.floor_name = result.name;
+            } else {
+              params.floor_name = '';
+            }
+            console.log('assigned floor', result.name);
+            return params;
+          });
+      } else {
+        console.log('skipping floor assigning', params);
+        return params;
+      }
+    };
+
+    let fetchPlace = (params) => {
+      if (params.hasOwnProperty('place_id') && params.place_id != null && !params.hasOwnProperty('place_name')) {
+        console.log('should fetch place', params.place_id);
+        return schemaManager.storage.table('places').get(params.place_id)
+          .then((result) => {
+            console.log('assign place result', result);
+            if (result != null) {
+              params.place_name = result.name;
+            } else {
+              params.place_name = '';
+            }
+            console.log('assigned place', result.name);
+            return params;
+          });
+      } else {
+        console.log('skipping place assigning', params);
+        return params;
+      }
+    };
+
+    let fetchDepartment = (params) => {
+      if (params.hasOwnProperty('department_id') && !params.hasOwnProperty('department_name')) {
+        console.log('should fetch department', params.department_id);
+        return schemaManager.storage.table('departments').get(params.department_id)
+          .then((result) => {
+            console.log('assign department result', result);
+            if (result != null) {
+              params.department_name = result.name;
+            } else {
+              params.department_name = '';
+            }
+            console.log('assigned department', result.name);
+            return params;
+          });
+      } else {
+        console.log('skipping department assigning', params);
+        return params;
+      }
+    };
+
     let createEntity = (params) => {
         return Model.insert(params).then(function (result) {
             params.id = result.generated_keys[0];
-            console.log('created record', params);
+            //console.log('created record', params);
             return params;
         });
     };
 
     let updateEntity = (params) => {
-        console.log('update entity with params:', params);
+        //console.log('update entity with params:', params);
         return Model.get(params.id).update(params)
             .then((result) => {
                 return params;
@@ -143,8 +357,8 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
 
     let updateElasticRecord = (req) => {
         return (data) => {
-            console.log('should update elastic record with tenant id', req.tenant.id, 'data', data);
-            elasticAdapter.update(resource, data, req.tenant.id);
+            //console.log('should update elastic record with tenant id', req.tenant.id, 'data', data, 'name', req.tenant.getName());
+            elasticAdapter.update(resource, data, req.tenant.id, req.tenant.getName());
             return data;
         }
     };
@@ -168,9 +382,9 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
 
     var respond = (req, res) => {
         return (params) => {
-            console.log('should respond:', formatOutput(params));
+          // console.log('should respond:', formatOutput(params));
             res.send(formatOutput(params));
-            console.log('response sent');
+            //console.log('response sent');
             return params;
         }
     };
@@ -188,6 +402,7 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
 
     let emitConfigChange = (req, action) => {
       return (params) => {
+       if (!req.query.ignore_config_change) {
         var event = {
           event: 'config-change',
           data: {
@@ -197,8 +412,15 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
           },
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
-        };
+        }
         event[schemaManager.getTenantIdField()] = req.consumer.id;
+
+        const geoSearchField = schemaManager.schema.resources[resource].schema.geoSearch;
+        const resourceAllowsGeoSearch = typeof geoSearchField != 'undefined'; 
+ 
+        if (resourceAllowsGeoSearch) {
+          event.data.location = params[geoSearchField];
+        }
 
         return requestPromise({
           uri: 'https://api.proximi.fi/core/events',
@@ -212,7 +434,24 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
         }).then((response) => {
           return params;
         }); 
+       } else {
+        console.log('ignoring config change');
+       }
       }
+    };
+
+    let fixNamespace = (params) => {
+      if (resource == 'input' && params.type == 'Eddystone Beacon') {
+        if (!params.data.hasOwnProperty('namespace') && params.data.hasOwnProperty('namespaceid')) {
+          params.data.namespace = params.data.namespaceid;
+        }
+        if (!params.data.hasOwnProperty('instanceId') && params.data.hasOwnProperty('instanceid')) {
+          params.data.instanceId = params.data.instanceid;
+        }
+        console.log('namespace fix called', params);
+      }
+
+      return params;
     };
  
     this.create = (req, res) => {
@@ -220,11 +459,11 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
         params[schemaManager.getTenantIdField()] = req.tenant.id;
         params.createdAt = new Date().toISOString();
         params.updatedAt = params.createdAt;
-        console.log('create params:', params);
+        //console.log('create params:', params);
         if (typeof _this.extensions != 'undefined' &&
             _this.extensions.hasOwnProperty('overrides') &&
             _this.extensions.overrides.hasOwnProperty('create')) {
-            console.log('calling create override for resource: ', resource);
+            //console.log('calling create override for resource: ', resource);
             _this.extensions.overrides.create(req, res);
         } else {
             if (typeof params['id'] != "undefined") {
@@ -232,6 +471,9 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
             }
             schemaModelHandler.checkParams(req.body, true, true)
                 .then(validateOwnership(req))
+                .then(fetchFloor)
+                .then(fetchPlace)
+                .then(fixNamespace)
                 .then(createEntity)
                 .then(getEntity)
                 .then(callExtensions(req, res, "create:after"))
@@ -244,7 +486,7 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
     };
 
     this.update = (req, res) => {
-        console.log('update for entity: ', resource, ' with params: ', req.body); 
+        //console.log('update for entity: ', resource, ' with params: ', req.body); 
         var params = req.body;
 
         if (schemaManager.multitenancy) {
@@ -263,6 +505,9 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
                 return schemaModelHandler.checkParams(entity, true);
             })
             .then(validateOwnership(req))
+            .then(fetchFloor)
+            .then(fetchPlace)
+            .then(fixNamespace)
             .then(updateEntity)
             .then(getEntity)
             .then(callExtensions(req, res, "update:after"))
@@ -273,6 +518,38 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
             .error(respondWithError(res));
     };
   
+    this.removePreviousRedBundle = (req, params) => {
+      //console.log('should remove previous bundle, current:', params.bundle_id);
+      return Model.getAll(req.tenant.id, { index: 'organization_id' })
+                  .filter((record) => {
+                    return record('bundle_id').eq(params.bundle_id).not();
+                  })
+                  .delete()
+                  .then(() => { return params; })
+    };
+ 
+    this.redUpdate = (req, res) => {
+      var params = req.body;
+      //console.log('redUpdate called for: ', params);
+      var redId = params.data.id;
+
+      if (schemaManager.multitenancy) {
+            params[schemaManager.getTenantIdField()] = req.tenant.id;
+      }
+
+      let create = (params) => {
+        //console.log('should create: ', params);
+        return Model.insert(params, {conflict: 'replace'});
+      }
+
+      this.removePreviousRedBundle(req, params)
+           .then(create)
+           .then(getRedEntity)
+           .then(respond(req, res))
+           .catch(respondWithError(res))
+           .error(respondWithError(res));
+    };
+
     this.destroy = (req, res) => {
         getEntity(req.params)
             .then(validateOwnership(req))
@@ -286,18 +563,31 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
     };
 
     this.upsert = (req, res) => {
-        if (req.body.id != null &&  req.body.id != "null" &&  req.body.id != "new" &&  typeof req.body.id != 'undefined') {
-            console.log('upsert calling update');
-            _this.update(req, res);
+        if (req.query.red) {
+          _this.redUpdate(req, res);
         } else {
-            console.log('upsert calling insert');
-            _this.create(req ,res);
-        }
-
+          //console.log('upsert params:', req.body);
+          if (req.body.id != null &&
+              req.body.id != "null" &&
+              req.body.id != "new" &&
+              typeof req.body.id != 'undefined') {
+              //console.log('upsert calling update');
+              _this.update(req, res);
+          } else {
+              //console.log('upsert calling insert');
+              _this.create(req ,res);
+          }
+       }
     };
+
+    this.actions = (req, res) => {
+      // just a dummy /actions action to workaround express id wildcard routing when adding custom ones
+      res.send({success: true});
+    }
 
     router.get('/' + this.plural, this.index);
     router.get('/' + this.plural + '/count', this.count);
+    router.post('/' + this.plural + '/actions', this.actions);
     router.get('/' + this.plural + '/:id', this.show);
     router.post('/' + this.plural, this.create);
     router.put('/' + this.plural, this.upsert);

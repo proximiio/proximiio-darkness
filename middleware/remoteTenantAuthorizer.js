@@ -108,7 +108,7 @@ var RemoteTenantAuthorizer = function(schemaManager) {
                 .then(remoteVerify)
                 .then(setAccessLevel)
                 .then(function(authResponse) {
-                    req.tenant = new Tenant(authResponse.tenant, schemaManager);
+                    req.tenant = authResponse.tenant;
                     req.user = authResponse.user;
                     req.token = authResponse.tokenPayload;
                     //Log.d(TAG, `token ${req.headers.authorization} authorized`);

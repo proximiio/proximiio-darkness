@@ -5,10 +5,11 @@ var pluralize = require('plur');
 var TokenManager = require('./token_manager');
 var TenantNotFoundError = require('./errors/tenantNotFoundError');
 var InvalidTokenError = require('./errors/invalidTokenError');
+var FirebaseTokenGenerator = require("firebase-token-generator");
 
 /**
  * Tenant object instance
-tok *
+ *
  * @param tenant {Object} - Tenant Data JSON
  * @param schemaManager {SchemaManager}
  * @returns {Tenant}
@@ -88,16 +89,18 @@ var Tenant = function(tenant, schemaManager) {
     this.authorizeToken = function(token) {
         return new Promise(function(resolve, reject) {
             var valid = _.contains(_this.data.tokens, token);
+            //console.log('token valid', valid);
             if (valid) {
                 var credentials = _this.getConsumerCredentials();
                 var payload = TokenManager.decode(token, credentials.secret);
                 if (payload != null) {
                     resolve(payload);
                 } else {
-                    throw new InvalidTokenError();
+                    reject(new InvalidTokenError());
                 }
             } else {
-                throw new InvalidTokenError();
+                console.log('rejecting authorizeToken');
+                reject(new InvalidTokenError());
             }
         });
     };
@@ -156,14 +159,36 @@ var Tenant = function(tenant, schemaManager) {
      * @returns {{id: *, name: *}}
      */
     this.public = function() {
-        return {
+        var eventBusTokenGenerator = new FirebaseTokenGenerator('WoFFQU9nRVFmV9hC4e8IVSsorpscneeKiJMLHzTL');
+        var positionsTokenGenerator = new FirebaseTokenGenerator('7nAmtspbOctzkqYGwyC4MCoZuAUrlEDL31xGb335');
+        var proximiioBusTokenGenerator = new FirebaseTokenGenerator('ygpPvJAsV7TTeRFF5dtPl6ZuFOUcQaVQNzuvzQht');
+
+        var eventBusToken = eventBusTokenGenerator.createToken({organization: _this.getId(), uid: _this.getId()});
+        var positionsToken = positionsTokenGenerator.createToken({organization: _this.getId(), uid: _this.getId()});
+
+        var proximiioBusToken = proximiioBusTokenGenerator.createToken({organization: _this.getId(), uid: _this.getId()});    
+        var proximiioBusRef = "https://proximiio-bus.firebaseio.com/organizations/" + _this.getId();
+
+        const data = {
             id: _this.getId(),
             name: _this.getName(),
             background: _this.data.background,
             country: _this.data.country,
             email: _this.data.email,
+            address: _this.data.address,
+            vat: _this.data.vat, 
+            provider: _this.data.provider,
+            eventBusToken: eventBusToken,
+            positionsToken: positionsToken,
+            proximiioBusToken: proximiioBusToken,
+            proximiioBusRef: proximiioBusRef,
             eventBusRef: schemaManager.settings().firebase.ref + '/' + schemaManager.getTenantEntityPlural() + '/' + _this.data.id + ''
         }
+        
+        if (typeof _this.data.red != 'undefined') {
+          data.red = _this.data.red;
+        }
+        return data;
     };
 
     /**
@@ -184,7 +209,6 @@ var Tenant = function(tenant, schemaManager) {
                 return _this;
             });
         } else {
-            console.log('updating tenant', _this.data, ' token count:', _this.data.tokens.length);
             // update
             return storage.get(_this.data.id).update(_this.data).run().then(function(results) {
                 return _this;
@@ -229,7 +253,6 @@ var Tenant = function(tenant, schemaManager) {
     this.decodeTokens = function() {
         var decoded = [];
         var credentials = TokenManager.decode(_this.data.consumerCredentials, schemaManager.schema.secret);
-        console.log('token count:', _this.data.tokens.length, _this.data.tokens);
         _this.data.tokens.forEach((token) => {
           var tokenObject = {};
           tokenObject[token] = TokenManager.decode(token, credentials.secret);

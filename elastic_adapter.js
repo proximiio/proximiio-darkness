@@ -1,8 +1,9 @@
 var Log = require('./logger');
 var Promise = require("bluebird");
-var request = Promise.promisify(require("request"));
-
-Promise.promisifyAll(request);
+var request = Promise.promisifyAll(require("request"));
+var plur = require('plur');
+var _ = require('underscore');
+var updateElasticRecord = require('./queue/elasticQueue').updateRecord;
 
 /**
  * ElasticSearch Adapter
@@ -13,8 +14,11 @@ Promise.promisifyAll(request);
  * @returns {module}
  * @constructor
  */
+
 var ElasticAdapter = function(schemaManager) {
     var TAG = 'ElasticAdapter';
+ 
+    var eClient = schemaManager.elasticClient;
 
     /**
      * Validates elasticsearch configuration in Darkness Schema
@@ -76,12 +80,75 @@ var ElasticAdapter = function(schemaManager) {
      */
     var path = function(resource, id, tenantId) {
         var index = schemaManager.schema.elasticsearch.indexKey;
+        tenantId = 'master';
+        if (resource == 'events' || resource == 'positions') {
+          index += '-' + resource;
+        } else {
+          index += '-' + plur(resource);
+        }
         if (schemaManager.multitenancy) {
             index += '-' + tenantId;
         }
         return schemaManager.schema.elasticsearch.root + '/' + index + '/' + resource + '/' + id;
     };
 
+    var indexPath = function(resource, id, tenantId) {
+       var index = schemaManager.schema.elasticsearch.indexKey;
+       tenantId = 'master';
+       //if (resource == 'events' || resource == 'positions') {
+          index += '-' + plur(resource);
+       //} 
+      
+       if (schemaManager.multitenancy) {
+         index += '-' + tenantId;
+       }
+       return schemaManager.schema.elasticsearch.root + '/' + index + '/' + resource + '/' + id;
+    };
+
+    this.search = function(resource, body) {
+      return new Promise((resolve, reject) => {
+        eClient.search({
+          index: 'proximi-' + plur(resource) + '-master',
+          body: body
+        }, function(error, response) {
+          if (error) {
+            console.log('elastic error', error);
+            reject(error);
+          } else {
+            var results = [];
+            if (typeof body.fields != 'undefined') {
+              results = _.map(response.hits.hits, (result) => { return result.fields; });
+            } else {
+              results = _.map(response.hits.hits, (result) => { return result._source; });
+            }
+            resolve({total: response.hits.total, results: results});
+          }
+        });
+      });
+    };
+
+    this.count = function(resource, tenantId) {
+      return new Promise((resolve, reject) => {
+        eClient.count({
+          index: 'proximi-' + plur(resource) + '-master',
+          body: {
+            query: {
+	      "constant_score" : { 
+                "filter" : {
+                  "match" : { "organization_id" : tenantId }
+                }
+              }
+            }
+          }
+        }, function(error, response) {
+          if (error) {
+            reject(error);
+          } else {
+            resolve(response.count);
+          }
+        });
+      });
+    }
 
     /**
      * updates elasticsearch record
@@ -92,22 +159,35 @@ var ElasticAdapter = function(schemaManager) {
      * @param [callback]
      */
 
-    this.update = function(resource, data, tenantId, callback) {
-        console.log('updating elasticsearch with ', data, ' tenantId', tenantId);
+    this.update = function(resource, data, tenantId, tenantName) {
+//        console.log('1updating elasticsearch with ', 'resource', resource, 'data',  data, ' tenantId', tenantId);
         if (available(data.id, tenantId)) {
+            if (resource == 'floor' && typeof data.anchors != 'undefined') {
+     	      data.geopoint = [parseFloat(data.anchors[0].lng), parseFloat(data.anchors[0].lat)];
+              for (var i=0; i < data.anchors.length; i++) {
+                var anchor = data.anchors[i];
+                anchor.lat = parseFloat(anchor.lat);
+                anchor.lng = parseFloat(anchor.lng);
+                //data.anchors[i] = anchorX;
+              }
+              //data.geopoint = [parseFloat(data.anchors[0].lng), parseFloat(data.anchors[0].lat)];
+            }
+            if (resource == 'geofence' && typeof data.area != 'undefined') {
+              data.geopoint = [parseFloat(data.area.lng), parseFloat(data.area.lat)];
+            }
+            if ((resource == 'place' || resource == 'position') && typeof data.location != 'undefined') {
+              data.geopoint = [parseFloat(data.location.lng), parseFloat(data.location.lat)];
+            }
+            if (resource == 'event' && typeof data.data != 'undefined' && typeof data.data.location != 'undefined') {
+              data.geopoint = [parseFloat(data.data.location.lng), parseFloat(data.data.location.lat)];
+            }
+            if (resource == 'input' && typeof data.data != 'undefined' && typeof data.data.marker != 'undefined') {
+              data.geopoint = [parseFloat(data.data.marker.lng), parseFloat(data.data.marker.lat)];
+            }
             var requestData = {url: path(resource, data.id, tenantId), body: JSON.stringify(data)};
-            request.putAsync(requestData)
-                   .then(function(response, body) {
-                        Log.system(TAG, 'updated: ', data.id);
-                        if (typeof callback != 'undefined') {
-                            callback(null, body);
-                        }
-                   }).catch(function(error) {
-                        Log.error(TAG, 'update error', error);
-                        if (typeof callback != 'undefined') {
-                            callback(error, null);
-                        }
-                   })
+            //console.log('requestData', requestData);
+
+            updateElasticRecord({index: 'proximi-' + plur(resource) + '-master', id: data.id, type: resource, body: { doc: data, doc_as_upsert: true }}, function() {});
         }
     };
 
@@ -120,7 +200,8 @@ var ElasticAdapter = function(schemaManager) {
      */
     this.delete = function(resource, id, tenantId, callback) {
         if (available(id, tenantId)) {
-            var requestData = {url: path(resource, tenantId, id)};
+            var requestData = {url: path(resource, id, tenantId)};
+            console.log('delete request data', requestData);
             request.delAsync(requestData)
                    .then(function(response, body) {
                         Log.system(TAG, 'deleted: ', id);

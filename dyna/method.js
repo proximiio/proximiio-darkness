@@ -51,20 +51,26 @@ var DynaMethod = function(method, schemaManager) {
                     resolve(req);
                 }
             });
-
         })
     };
 
-    this.process = (req) => {
+    this.process = (res) => {
+      return (req) => {
         var _this = this;
         return new Promise((resolve, reject) => {
-            try {
-                _this.extension.execute(method.desc().method == 'get' ? req.query : req.body, resolve, reject, schemaManager, req.tenant, req);
-            } catch (error) {
+            if (req.headers['x-consumer-custom-id'] != '2fd91f35-5243-4226-b182-e138d34825f5') {
+              reject(new Error("Unauthorized"));
+            } else {
+              console.log('DYNA PROCESS', req.headers['x-consumer-custom-id']);
+              try {
+                _this.extension.execute(method.desc().method == 'get' ? req.query : req.body, resolve, reject, schemaManager, req.tenant, req, res);
+              } catch (error) {
                 console.log('dynamethod catch', error);
                 reject(error);
+              }
             }
         });
+      };
     };
 
     this.schema = () => {
@@ -83,7 +89,7 @@ var DynaMethod = function(method, schemaManager) {
 
     this.requestHook = (req, res) => {
         this.validate(req)
-            .then(this.process)
+            .then(this.process(res))
             .then(this.respond(res))
             .catch(this.respondWithError(res));
     };

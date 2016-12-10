@@ -26,13 +26,24 @@ var User = function(data, schemaManager) {
 
     this.changePassword = function(newPassword) {
         var encrypted = TokenManager.encode(newPassword, schemaManager.schema.secret); 
-        storage.get(_this.getId())
+        console.log('changing password to: ', encrypted);
+        return storage.get(_this.getId())
                .update({password: encrypted})
                .then((results) => {
                  _this.data.password = encrypted;
-                 return _this; 
+                 _this.data.updatedAt = new Date().toISOString();
+                 return _this.getTenant()
+                             .then((tenant) => {
+                               tenant.data.password = encrypted;
+                               tenant.data.updatedAt = new Date().toISOString();
+                               return tenant.save()
+                                            .then((tenant) => {
+                                              return _this;
+                                            });
+                             });
                });
     };
+
     /**
      * Upserts current user data to datastore
      *
@@ -111,6 +122,8 @@ var User = function(data, schemaManager) {
         return {
             id: this.data.id,
             name: this.data.name,
+            first_name: this.data.first_name,
+            last_name: this.data.last_name,
             email: this.data.email
         }
     };
@@ -156,6 +169,15 @@ User.findByToken = function(token, schemaManager) {
     })
 };
 
+User.findByEmail = function(email, schemaManager) {
+    return schemaManager.storage.table('users').filter({email: email}).run().then(function(data) {
+        if (data.length == 1) {
+            return new User(data[0], schemaManager);
+        } else {
+            throw new UserNotFoundError();
+        }
+    })
+};
 /**
  * Finds user using id
  *

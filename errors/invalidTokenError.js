@@ -6,7 +6,7 @@
  */
 var InvalidTokenError = function(error) {
     this.name = "InvalidTokenError";
-    this.code = 1001;
+    this.code = 403;
     this.message = "Invalid Token";
 
     this.json = JSON.stringify({

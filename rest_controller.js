@@ -457,6 +457,7 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
     this.create = (req, res) => {
         var params = req.body;
         params[schemaManager.getTenantIdField()] = req.tenant.id;
+        params.organization_name = req.tenant.getName();
         params.createdAt = new Date().toISOString();
         params.updatedAt = params.createdAt;
         //console.log('create params:', params);

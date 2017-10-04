@@ -106,6 +106,7 @@ var ElasticAdapter = function(schemaManager) {
     };
 
     this.search = function(resource, body) {
+      console.log('search body', JSON.stringify(body, null, 4));
       return new Promise((resolve, reject) => {
         eClient.search({
           index: 'proximi-' + plur(resource) + '-master',
@@ -160,7 +161,7 @@ var ElasticAdapter = function(schemaManager) {
      */
 
     this.update = function(resource, data, tenantId, tenantName) {
-//        console.log('1updating elasticsearch with ', 'resource', resource, 'data',  data, ' tenantId', tenantId);
+        //console.log('1updating elasticsearch with ', 'resource', resource, 'data',  data, ' tenantId', tenantId);
         if (available(data.id, tenantId)) {
             if (resource == 'floor' && typeof data.anchors != 'undefined') {
      	      data.geopoint = [parseFloat(data.anchors[0].lng), parseFloat(data.anchors[0].lat)];
@@ -187,7 +188,7 @@ var ElasticAdapter = function(schemaManager) {
             var requestData = {url: path(resource, data.id, tenantId), body: JSON.stringify(data)};
             //console.log('requestData', requestData);
 
-            updateElasticRecord({index: 'proximi-' + plur(resource) + '-master', id: data.id, type: resource, body: { doc: data, doc_as_upsert: true }}, function() {});
+            updateElasticRecord({index: 'proximi-' + plur(resource) + '-master', id: data.id, type: resource, body: { doc: data, doc_as_upsert: true }}, function(something) {});
         }
     };
 

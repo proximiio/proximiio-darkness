@@ -52,6 +52,8 @@ Darkness.start = function(schemaFilePath, callback) {
     Log.system('DarknessFramework', 'starting application', appSchema.name.cyan.bold + (' ('+appSchema.version+')').white.bold);
 
     var port = process.env.PORT || schemaManager.settings().servers.http.port;
+    var host = process.env.HOST || schemaManager.settings().servers.http.host;
+
     var resourcesRoot = appSchema.apiRoot;
     var app = express();
     app.use(responseTime())
@@ -77,8 +79,8 @@ Darkness.start = function(schemaFilePath, callback) {
         });
         var bodyParser = require('body-parser');
         app.use(express.static(__dirname + '/public'));
-        app.use(bodyParser.urlencoded({ extended: true }));
-        app.use(bodyParser.json());
+        app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }));
+        app.use(bodyParser.json({limit: '50mb'}));
         app.use(require('./middleware/request_logger'));
         app.use('/kue-api', kue.app);
         app.use('/kue', kueUI.app);
@@ -114,9 +116,11 @@ Darkness.start = function(schemaFilePath, callback) {
     };
 
     let initAuthController = (app) => {
+        //console.log('auth1');
         let authController = new AuthController(schemaManager);
         app.use(schemaManager.schema.authRoot, authController.router);
         Log.system('AuthController', 'exposed to '.white + authController.authRoot.yellow.bold + ' endpoint'.white);
+        //console.log('auth2');
         return app;
     };
 
@@ -154,7 +158,7 @@ Darkness.start = function(schemaFilePath, callback) {
     };
 
     let startWebServer = (app) => {
-        app.listen(port);
+        app.listen(port, host);
         Log.system('WebServer', 'running at port', (port+'').green.bold);
         return app;
     };
@@ -165,6 +169,7 @@ Darkness.start = function(schemaFilePath, callback) {
         var __executionTime = `${__measureExecTitle} ${__measureExecTime2[0]}.${Math.round(__measureExecTime2[1]/(1000*1000))}s`;
 
         var currentUser = function(req, res) {
+            //console.log('current user token', req.token, 'tenant', req.tenant.public());
             if (req.token.type == 'user') {
               User.findByToken(req.consumer.token, schemaManager).then(function(user) {
                 var response = user.public();
@@ -248,7 +253,7 @@ Darkness.start = function(schemaFilePath, callback) {
             data.vat = req.body.organization.vat;
           }
 
-          console.log('should save data: ', data, 'mapProvider', mapProvider);
+          //console.log('should save data: ', data, 'mapProvider', mapProvider);
           schemaManager.storage.table('organizations').get(req.tenant.id).update(data).then((result) => {
             return Tenant.get(req.tenant.id, schemaManager).then((tenant) => {
               return schemaManager.redisClient.setAsync(req.headers["x-consumer-custom-id"], JSON.stringify(tenant.data)).then((redisResult) => {
@@ -356,7 +361,6 @@ Darkness.start = function(schemaFilePath, callback) {
         .then(startWebServer)
         .then(finalize)
         .catch((error) => {
-            "use strict";
             Log.error("DarknessError", error);
         });
 };

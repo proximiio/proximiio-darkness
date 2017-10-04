@@ -115,7 +115,6 @@ var TenantAuthorizer = function(schemaManager) {
             };
 
             checkPrerequisites()
-                .then(getCache)
                 .then(loadTenant)
                 .then(authorizeToken)
                 .then(setAccessLevel)

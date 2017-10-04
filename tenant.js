@@ -89,7 +89,6 @@ var Tenant = function(tenant, schemaManager) {
     this.authorizeToken = function(token) {
         return new Promise(function(resolve, reject) {
             var valid = _.contains(_this.data.tokens, token);
-            //console.log('token valid', valid);
             if (valid) {
                 var credentials = _this.getConsumerCredentials();
                 var payload = TokenManager.decode(token, credentials.secret);
@@ -99,7 +98,7 @@ var Tenant = function(tenant, schemaManager) {
                     reject(new InvalidTokenError());
                 }
             } else {
-                console.log('rejecting authorizeToken');
+                console.error('rejecting authorizeToken');
                 reject(new InvalidTokenError());
             }
         });
@@ -149,7 +148,7 @@ var Tenant = function(tenant, schemaManager) {
      * @returns {boolean}
      */
     this.validatesOwnership = function(entity) {
-        console.log('checking entity:', entity, ' attribute: ', schemaManager.schema.multitenancy.entity + '_id', ' for match with', _this.data.id);
+        //console.log('checking entity:', entity, ' attribute: ', schemaManager.schema.multitenancy.entity + '_id', ' for match with', _this.data.id);
         return entity[schemaManager.schema.multitenancy.entity + '_id'] == _this.data.id;
     };
 
@@ -169,6 +168,17 @@ var Tenant = function(tenant, schemaManager) {
         var proximiioBusToken = proximiioBusTokenGenerator.createToken({organization: _this.getId(), uid: _this.getId()});    
         var proximiioBusRef = "https://proximiio-bus.firebaseio.com/organizations/" + _this.getId();
 
+        var stripePlan = 'hobby';
+        var trialEnd = false;
+        var planStatus = 'trialing';
+        //console.log('login stirpe', _this.data.stripe);
+        if (_this.data.stripe && _this.data.stripe.subscriptions !== undefined && _this.data.stripe.subscriptions.data !== undefined &&
+            _this.data.stripe.subscriptions.data.length > 0) {
+          stripePlan = _this.data.stripe.subscriptions.data[0].plan.id;
+          trialEnd = _this.data.stripe.subscriptions.data[0].trial_end;
+          planStatus = _this.data.stripe.subscriptions.data[0].status;
+        }
+        
         const data = {
             id: _this.getId(),
             name: _this.getName(),
@@ -178,6 +188,10 @@ var Tenant = function(tenant, schemaManager) {
             address: _this.data.address,
             vat: _this.data.vat, 
             provider: _this.data.provider,
+            stripe: _this.data.stripe !== undefined,
+            plan: stripePlan,
+            planStatus: planStatus,
+            trialEnd: trialEnd,
             eventBusToken: eventBusToken,
             positionsToken: positionsToken,
             proximiioBusToken: proximiioBusToken,
@@ -198,16 +212,17 @@ var Tenant = function(tenant, schemaManager) {
      */
     this.save = function() {
         if (typeof _this.data.id == 'undefined') {
-           console.log('inserting tenant', _this.data);
+           //console.log('inserting tenant', _this.data);
             // create
             _this.data.createdAt = new Date().toISOString();
             _this.data.updatedAt = _this.data.createdAt;
             _this.data.password = TokenManager.encode(_this.data.password, schemaManager.schema.secret);
             return storage.insert(_this.data).run().then(function(results) {
+                //console.log('tenant saved');
                 _this.data.id = results.generated_keys[0];
                 _this.id = _this.data.id;
                 return _this;
-            });
+            }).catch((error) => { console.error('TENANT CREATE ERROR', error)});
         } else {
             // update
             return storage.get(_this.data.id).update(_this.data).run().then(function(results) {

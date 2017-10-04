@@ -1,7 +1,61 @@
 {
+  "_args": [
+    [
+      {
+        "raw": "proximiio-darkness@git+https://53aa09407a3760d88d10be18022b6a9659a2ed71:x-oauth-basic@github.com/proximiio/proximiio-darkness.git",
+        "scope": null,
+        "escapedName": "proximiio-darkness",
+        "name": "proximiio-darkness",
+        "rawSpec": "git+https://53aa09407a3760d88d10be18022b6a9659a2ed71:x-oauth-basic@github.com/proximiio/proximiio-darkness.git",
+        "spec": "git+https://53aa09407a3760d88d10be18022b6a9659a2ed71:x-oauth-basic@github.com/proximiio/proximiio-darkness.git",
+        "type": "hosted",
+        "hosted": {
+          "type": "github",
+          "ssh": "git@github.com:proximiio/proximiio-darkness.git",
+          "sshUrl": "git+ssh://git@github.com/proximiio/proximiio-darkness.git",
+          "httpsUrl": "git+https://53aa09407a3760d88d10be18022b6a9659a2ed71:x-oauth-basic@github.com/proximiio/proximiio-darkness.git",
+          "gitUrl": "git://53aa09407a3760d88d10be18022b6a9659a2ed71:x-oauth-basic@github.com/proximiio/proximiio-darkness.git",
+          "shortcut": "github:proximiio/proximiio-darkness",
+          "directUrl": "https://53aa09407a3760d88d10be18022b6a9659a2ed71:x-oauth-basic@raw.githubusercontent.com/proximiio/proximiio-darkness/master/package.json"
+        }
+      },
+      "/opt/proximiio-core"
+    ]
+  ],
+  "_from": "git+https://53aa09407a3760d88d10be18022b6a9659a2ed71:x-oauth-basic@github.com/proximiio/proximiio-darkness.git",
+  "_id": "proximiio-darkness@1.2.0",
+  "_inCache": true,
+  "_location": "/proximiio-darkness",
+  "_phantomChildren": {},
+  "_requested": {
+    "raw": "proximiio-darkness@git+https://53aa09407a3760d88d10be18022b6a9659a2ed71:x-oauth-basic@github.com/proximiio/proximiio-darkness.git",
+    "scope": null,
+    "escapedName": "proximiio-darkness",
+    "name": "proximiio-darkness",
+    "rawSpec": "git+https://53aa09407a3760d88d10be18022b6a9659a2ed71:x-oauth-basic@github.com/proximiio/proximiio-darkness.git",
+    "spec": "git+https://53aa09407a3760d88d10be18022b6a9659a2ed71:x-oauth-basic@github.com/proximiio/proximiio-darkness.git",
+    "type": "hosted",
+    "hosted": {
+      "type": "github",
+      "ssh": "git@github.com:proximiio/proximiio-darkness.git",
+      "sshUrl": "git+ssh://git@github.com/proximiio/proximiio-darkness.git",
+      "httpsUrl": "git+https://53aa09407a3760d88d10be18022b6a9659a2ed71:x-oauth-basic@github.com/proximiio/proximiio-darkness.git",
+      "gitUrl": "git://53aa09407a3760d88d10be18022b6a9659a2ed71:x-oauth-basic@github.com/proximiio/proximiio-darkness.git",
+      "shortcut": "github:proximiio/proximiio-darkness",
+      "directUrl": "https://53aa09407a3760d88d10be18022b6a9659a2ed71:x-oauth-basic@raw.githubusercontent.com/proximiio/proximiio-darkness/master/package.json"
+    }
+  },
+  "_requiredBy": [
+    "/"
+  ],
+  "_resolved": "git+https://53aa09407a3760d88d10be18022b6a9659a2ed71:x-oauth-basic@github.com/proximiio/proximiio-darkness.git#4c21360acad3619191ec42871d09959ba001ae37",
+  "_shasum": "417ce629e22367b185534bf877d3f20776ffd567",
+  "_shrinkwrap": null,
+  "_spec": "proximiio-darkness@git+https://53aa09407a3760d88d10be18022b6a9659a2ed71:x-oauth-basic@github.com/proximiio/proximiio-darkness.git",
+  "_where": "/opt/proximiio-core",
   "author": {
-    "email": "support@proximi.io",
-    "name": "Proximi.io Developer Team"
+    "name": "Proximi.io Developer Team",
+    "email": "support@proximi.io"
   },
   "dependencies": {
     "bluebird": "^3.2.1",
@@ -20,6 +74,7 @@
     "jwt-simple": "^0.4.1",
     "kue": "^0.11.5",
     "kue-ui": "^0.1.0",
+    "moment": "^2.17.1",
     "password-generator": "^2.0.2",
     "plur": "^2.1.2",
     "prettyjson": "^1.1.3",
@@ -30,6 +85,7 @@
     "response-time": "^2.3.2",
     "rethinkdbdash": "^2.2.17",
     "ssl-root-cas": "^1.1.10",
+    "stripe": "^4.14.0",
     "underscore": "^1.8.3",
     "write-yaml": "^0.2.2"
   },
@@ -38,6 +94,7 @@
     "jsdoc": "^3.4.0",
     "minami": "^1.1.1"
   },
+  "gitHead": "4c21360acad3619191ec42871d09959ba001ae37",
   "license": "UNLICENSED",
   "main": "app.js",
   "name": "proximiio-darkness",

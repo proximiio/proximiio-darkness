@@ -184,6 +184,7 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
         schemaManager.elasticAdapter.count(resource, req.tenant.id)
           .then((count) => { 
              res.set('RecordCount', count);
+             //console.log('RecordCount set', count);
              schemaManager.elasticAdapter.search(resource, bundle)
                .then((response) => {
                  res.set('SearchCount', response.total);
@@ -221,7 +222,7 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
         getEntity(req.params)
             .then(validateOwnership(req))
             .then((data) => {
-               if (resource == 'geofence') {
+               if (resource == 'geofenceZ') {
 		        return schemaManager.storage.table('events')
                             .filter({organization_id: req.tenant.id, event: 'enter', geofence_id: req.params.geofence_id})
                             .filter(function(doc) {
@@ -352,6 +353,9 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
         return Model.get(params.id).delete().then((result) => {
             params.isDeleted = true;
             return params;
+        }).catch((error) => {
+          params.isDeleted = true;
+          return params;
         });
     };
 
@@ -382,9 +386,9 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
 
     var respond = (req, res) => {
         return (params) => {
-          // console.log('should respond:', formatOutput(params));
+           console.log('should respond:', formatOutput(params));
             res.send(formatOutput(params));
-            //console.log('response sent');
+            console.log('response sent', res.headers);
             return params;
         }
     };
@@ -457,9 +461,11 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
     this.create = (req, res) => {
         var params = req.body;
         params[schemaManager.getTenantIdField()] = req.tenant.id;
-        params.organization_name = req.tenant.getName();
-        params.createdAt = new Date().toISOString();
+        if (typeof params.createdAt === "undefined") {
+          params.createdAt = new Date().toISOString();
+        }
         params.updatedAt = params.createdAt;
+        params.organization_name = req.tenant.getName();
         //console.log('create params:', params);
         if (typeof _this.extensions != 'undefined' &&
             _this.extensions.hasOwnProperty('overrides') &&
@@ -499,8 +505,14 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
         }
 
         params.updatedAt = (new Date()).toISOString();
-        
-        getEntity(req.body)
+       
+        if (typeof _this.extensions != 'undefined' &&
+            _this.extensions.hasOwnProperty('overrides') &&
+            _this.extensions.overrides.hasOwnProperty('update')) {
+            console.log('calling update override for resource: ', resource);
+            _this.extensions.overrides.update(req, res);
+        } else { 
+          getEntity(req.body)
             .then((entity) => {
                 Object.assign(entity, params);
                 return schemaModelHandler.checkParams(entity, true);
@@ -517,6 +529,7 @@ module.exports = function RestController(resource, schemaModelHandler, datastore
             .then(emitConfigChange(req, 'update'))
             .catch(respondWithError(res))
             .error(respondWithError(res));
+        }
     };
   
     this.removePreviousRedBundle = (req, params) => {

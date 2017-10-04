@@ -3,7 +3,7 @@ var queue = kue.createQueue();
 var request = require("request");
 var elastic;
 
-kue.app.listen(9090);
+//kue.app.listen(9090);
 
 queue.watchStuckJobs(5000);
 
@@ -16,24 +16,26 @@ queue.on('error', (err) => {
 });
 
 const updateRecord = (data, done) => {
-  queue.create('elastic-updates', data)
+  var job = queue.create('elastic-updates', data)
     .priority('critical')
     .attempts(3)
     .backoff(true)
-    .removeOnComplete(false)
+    .removeOnComplete(true)
     .save((err) => {
       if (err) {
-        console.error('QUEUE elastic-update FAILURE', err);
+        console.error('QUEUE elastic-update FAILURE', err, 'job:', job.id);
         done(err);
       } else {
+        //console.log("job injected", job.id);
         done();
       }
     });
 };
 
 queue.process('elastic-updates', 10, (job, done) => {
-  //console.log('[Q:elastic-updates]', job.id);
-  elastic.update(job.data, done);
+  elastic.update(job.data, function(result) {
+    done();
+  });
 });
 
 module.exports = {

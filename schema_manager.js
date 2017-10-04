@@ -9,6 +9,8 @@ var elasticsearch = require('elasticsearch');
 var bluebird = require('bluebird');
 var redis = require('redis');
 
+const eventQueue = require('./queue/eventQueue');
+
 bluebird.promisifyAll(redis.RedisClient.prototype);
 bluebird.promisifyAll(redis.Multi.prototype);
 
@@ -50,6 +52,10 @@ module.exports = function SchemaManager(schema, environment) {
     this.elasticClient = new elasticsearch.Client(this.schema.settings[this.environment].elasticsearch);
     require('./queue/elasticQueue').setClient(this.elasticClient);
     this.elasticAdapter = new ElasticAdapter(this);
+
+    eventQueue.setStorage(this.storage);
+    eventQueue.setElasticAdapter(this.elasticAdapter);
+    this.eventQueue = eventQueue;
 
     this.settings = function() {
         return _this.schema.settings[this.environment];

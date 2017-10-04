@@ -7,10 +7,14 @@ var RegistrationController = require('./registration_controller');
 var TokenManager = require('./token_manager');
 var PasswordGenerator = require('password-generator');
 var requestPromise = require('request-promise');
+var stripeQueue = require(__dirname + '/queue/stripeQueue');
 
 module.exports = function AuthController(schemaManager) {
 
     this.authRoot = schemaManager.schema.authRoot;
+
+    stripeQueue.setStorage(schemaManager.storage);
+    stripeQueue.setToken(schemaManager.schema.keys.stripe);
 
     /**
      * Convenience method for error request responses
@@ -91,7 +95,7 @@ module.exports = function AuthController(schemaManager) {
             header: {
               from: 'support@proximi.io',
               to: user.data.email,
-              bcc: 'matej.drzik@quanto.sk',
+              bcc: 'support@proximi.io',
               subject: "Your password has been reset."
             },
             data: data
@@ -114,10 +118,10 @@ module.exports = function AuthController(schemaManager) {
 
     let checkCompany = (req, res) => {
       var name = req.body.name;
-      console.log('searching organizations for name:', name, req.body);
+      //console.log('searching organizations for name:', name, req.body);
       if (typeof name != "undefined" && name != null) { 
         schemaManager.storage.table('organizations').filter({company: name}).then((results) => {
-          console.log('company results', results);
+          //console.log('company results', results);
           res.send({
             available: (Array.isArray(results) && results.length == 0)
           })
@@ -137,7 +141,7 @@ module.exports = function AuthController(schemaManager) {
         var email = req.body.email;
         var password = req.body.password;
         var encodedPassword = TokenManager.encode(password, schemaManager.schema.secret);
-        console.log('login pw:', password, 'encoded', encodedPassword);
+        //console.log('login pw:', password, 'encoded', encodedPassword);
         var loadTenantAndBuildResponse = function(user) {
             return user.getTenant().then(function(tenant) {
                 var response = {
@@ -160,15 +164,18 @@ module.exports = function AuthController(schemaManager) {
             .then(loadTenantAndBuildResponse)
             .then(function(response) {
                 schemaManager.log('core-AuthController', 'Login successful', { organization_id: response.organization.id, email: email, client: req.headers.client });
-                var manage = 'http://lab.proximi.io:9010';
-                if (req.headers.origin == manage) {
-                  if (email == 'devs@proximi.io') {
+                var sharedPortal = 'https://portal.proximi.io';
+                //console.log('login organization', response.organization);
+                if (req.headers.origin == sharedPortal && !response.organization.stripe && response.organization.plan != 'enterprise') {
+                  //console.log('should create customer origin:', req.headers.origin, 'org.stripe:', response.organization.stripe, 'plan', response.organization.plan);
+                  stripeQueue.createCustomer(response.organization, (error) => {
+                    if (error) {
+                      console.log('stripeError', error);
+                    };
                     res.send(JSON.stringify(response));
-                  } else {
-                    res.status(401).send("Unauthorized");
-                  }
+                  });
                 } else {
-                  console.log('login called, origin', req.headers.origin);
+                  //console.log('login called, origin', req.headers.origin);
                   res.send(JSON.stringify(response));
                 }
             })

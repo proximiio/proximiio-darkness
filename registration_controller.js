@@ -14,7 +14,9 @@ var TokenManager = require(__dirname + '/token_manager');
 var Tenant = require(__dirname + '/tenant');
 var User = require(__dirname + '/user');
 var requestPromise = require('request-promise');
- 
+var uuid = require('uuid'); 
+var stripeQueue = require(__dirname + '/queue/stripeQueue');
+
 var RegistrationController = function(schemaManager) {
     var _this = this;
 
@@ -41,6 +43,7 @@ var RegistrationController = function(schemaManager) {
     var createTenant = function(data) {
         return function(isAllowed) {
             if (isAllowed) {
+//                data.id = uuid.v4();
                 data.email = data.email.toLowerCase();
                 if (typeof data.background == 'undefined' || data.background.length == 0) {
                   data.background = 'undefined';
@@ -52,8 +55,9 @@ var RegistrationController = function(schemaManager) {
                 if (typeof data.referral == 'undefined') {
                   data.referral = 'undefined';
                 }
-                data.plan = 'free';
+                data.plan = 'guru';
                 var tenant = new Tenant(data, schemaManager);
+                console.log('should save tenant', tenant.data);
                 return tenant.save();
             } else {
                 throw new EmailUniquenessError();
@@ -162,6 +166,7 @@ var RegistrationController = function(schemaManager) {
             steerpathndd: ""
           }
         };
+        console.log('creating app with tenant:', tenant, tenant.data.tokens);
         return requestPromise({
           uri: 'https://api.proximi.fi/core/applications',
           method: 'POST',
@@ -251,16 +256,36 @@ var RegistrationController = function(schemaManager) {
     var registration = function(req, res) {
         var params = req.body;
         params.name = params.last_name + " " + params.first_name;
+        var tempOrg;
         if (emailValidator.format(params.email.toLowerCase())) {
             emailValidator.uniqueness(schemaManager, params.email.toLowerCase())
                 .then(verifyUniqueness(params))
                 .then(createTenant(params))
-                .then(addKongConsumer)
-                .then(addKongConsumerCredentials)
+                .then((tenant) => {
+                  const key = tenant.id;
+                  const secret = uuid.v4();
+                  console.log('tenant to set', tenant);
+		  tenant.setConsumerCredentials({key: key, secret: secret});
+                  tempOrg = tenant;
+                  return tenant.save();
+                })
                 .then(addUserAccount(params.name, params.email.toLowerCase(), params.password))
                 .then(addApplication)
                 .then(sendWelcomeEmail(params))
                 .then(sendRegistrationAlertEmail(params))
+                .then((tenant) => {
+                  return new Promise((resolve, reject) => {
+                    stripeQueue.createCustomer(tenant.public(), (error) => {
+                      console.log('back in registration', error);
+                      if (error) {
+                        console.log('stripeError', error);
+                        reject(error);
+                      } else {
+                        Tenant.get(tenant.id, schemaManager).then((_tenant) => { resolve(_tenant) });
+                      };
+                    });
+                  })
+                })
                 .then(loginUser(req, params))
                 .then(function(response) {
                     res.send(response);
